@@ -45,3 +45,10 @@
   name = "github.com/gorilla/mux"
   version = "1.7.0"
 
+[[constraint]]
+  name = "github.com/google/go-github"
+  version = "22.0.0"
+
+[[constraint]]
+  name = "github.com/robfig/cron"
+  version = "1.1.0"

@@ -2,11 +2,11 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/golang-migrate/migrate"
 	migratepg "github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/golang-migrate/migrate/source/file"
 	_ "github.com/lib/pq"
+	"log"
 )
 
 const (
@@ -27,7 +27,7 @@ func UpdateSchema(db *sql.DB) error {
 	}
 	err = m.Up()
 	if err == migrate.ErrNoChange {
-		fmt.Println("Database schema already up to date")
+		log.Println("No changes to the database schema have been made")
 		err = nil
 	}
 	return err
