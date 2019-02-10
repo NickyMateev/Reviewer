@@ -32,12 +32,11 @@ func (prf PullRequestFetcher) Name() string {
 
 // Period returns the period of time when the PullRequestFetcher job should execute
 func (prf PullRequestFetcher) Period() string {
-	return "1m"
+	return "10s"
 }
 
-
 // Run executes the PullRequestFetcher job
-func (prf PullRequestFetcher) Run()  {
+func (prf PullRequestFetcher) Run() {
 	log.Printf("STARTING %v job", prf.Name())
 
 	projects, err := models.Projects().All(context.Background(), prf.db)
@@ -61,7 +60,7 @@ func (prf PullRequestFetcher) Run()  {
 	}
 }
 
-func (prf PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectName string)  {
+func (prf PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectName string) {
 	for _, pr := range pullRequests {
 		exists, err := models.PullRequests(qm.Where("github_id = ?", pr.GetID())).Exists(context.Background(), prf.db)
 		if err != nil {
@@ -70,7 +69,7 @@ func (prf PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullReque
 
 		if !exists {
 			log.Printf("Persisting new pull request: %q (%v)\n", pr.GetTitle(), projectName)
-			pr := models.PullRequest{Title: pr.GetTitle(), URL: pr.GetHTMLURL(), GithubID: pr.GetID(),CreatedAt: time.Now(), UpdatedAt: time.Now()}
+			pr := models.PullRequest{Title: pr.GetTitle(), URL: pr.GetHTMLURL(), GithubID: pr.GetID(), CreatedAt: time.Now(), UpdatedAt: time.Now()}
 			err := pr.Insert(context.Background(), prf.db, boil.Infer())
 			if err != nil {
 				log.Panicf("Pull request %q could not be persisted: %v (%v)\n", pr.Title, err.Error(), projectName)

@@ -1,0 +1,6 @@
+server:
+  port: 8888
+  request_timeout: 4000ms
+storage:
+  type: postgres
+  uri: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable

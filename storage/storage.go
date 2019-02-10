@@ -2,26 +2,51 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/golang-migrate/migrate"
 	migratepg "github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/golang-migrate/migrate/source/file"
 	_ "github.com/lib/pq"
 	"log"
+	"path"
+	"runtime"
 )
 
-const (
-	DbType           = "postgres"
-	ConnectionString = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
-	MigrationsPath = "file://storage/migrations"
+var (
+	_, file, _, _ = runtime.Caller(0)
+	basepath      = path.Dir(file)
 )
 
-// UpdateSchema makes sure the DB schema is up-to-date and all migrations have been applied
-func UpdateSchema(db *sql.DB) error {
+// Config holds all storage configuration settings
+type Config struct {
+	Type string
+	URI  string
+}
+
+// New creates an *sql.DB object and updates the database with the latest migrations
+func New(cfg Config) (*sql.DB, error) {
+	db, err := sql.Open(cfg.Type, cfg.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	err = updateSchema(db, cfg.Type)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Database is up-to-date")
+
+	return db, nil
+}
+
+func updateSchema(db *sql.DB, dbType string) error {
 	driver, err := migratepg.WithInstance(db, &migratepg.Config{})
 	if err != nil {
 		return err
 	}
-	m, err := migrate.NewWithDatabaseInstance(MigrationsPath, DbType, driver)
+
+	migrationsURL := fmt.Sprintf("file://%s/migrations", basepath)
+	m, err := migrate.NewWithDatabaseInstance(migrationsURL, dbType, driver)
 	if err != nil {
 		return err
 	}
