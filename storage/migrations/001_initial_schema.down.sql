@@ -1,0 +1,11 @@
+BEGIN;
+
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS project_users;
+DROP TABLE IF EXISTS pull_requests;
+DROP TABLE IF EXISTS approvers;
+DROP TABLE IF EXISTS commenters;
+DROP TABLE IF EXISTS idlers;
+
+COMMIT;

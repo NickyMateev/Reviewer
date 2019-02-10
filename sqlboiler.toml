@@ -1,0 +1,36 @@
+[psql]
+  dbname = "postgres"
+  host   = "localhost"
+  port   = 5432
+  user   = "postgres"
+  pass   = "postgres"
+  schema = "public"
+  sslmode = "disable"
+  blacklist = ["schema_migrations"]
+
+[aliases.tables.project_users.relationships.project_users_project_id_fkey]
+local = "Contributors"
+foreign = "Projects"
+
+[aliases.tables.pull_requests.relationships.pull_requests_user_id_fkey]
+local   = "AuthoredPullRequests"
+foreign = "Author"
+
+[aliases.tables.approvers.relationships.approvers_user_id_fkey]
+local = "ApprovedPullRequests"
+foreign = "Approvers"
+
+[aliases.tables.commenters.relationships.commenters_user_id_fkey]
+local = "CommentedPullRequests"
+foreign = "Commenters"
+
+[aliases.tables.idlers.relationships.idlers_user_id_fkey]
+local = "IdledPullRequests"
+foreign = "Idlers"
+
+[[types]]
+  [types.match]
+    type = "int"
+    nullable = false
+  [types.replace]
+    type = "int64"
