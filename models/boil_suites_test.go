@@ -103,11 +103,13 @@ func TestToMany(t *testing.T) {
 	t.Run("PullRequestToApprovers", testPullRequestToManyApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManyCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManyIdlers)
+	t.Run("PullRequestToReviewers", testPullRequestToManyReviewers)
 	t.Run("UserToApprovedPullRequests", testUserToManyApprovedPullRequests)
 	t.Run("UserToCommentedPullRequests", testUserToManyCommentedPullRequests)
 	t.Run("UserToIdledPullRequests", testUserToManyIdledPullRequests)
 	t.Run("UserToProjects", testUserToManyProjects)
 	t.Run("UserToAuthoredPullRequests", testUserToManyAuthoredPullRequests)
+	t.Run("UserToRequestedReviews", testUserToManyRequestedReviews)
 }
 
 // TestToOneSet tests cannot be run in parallel
@@ -118,9 +120,7 @@ func TestToOneSet(t *testing.T) {
 
 // TestToOneRemove tests cannot be run in parallel
 // or deadlocks can occur.
-func TestToOneRemove(t *testing.T) {
-	t.Run("PullRequestToUserUsingAuthoredPullRequests", testPullRequestToOneRemoveOpUserUsingAuthor)
-}
+func TestToOneRemove(t *testing.T) {}
 
 // TestOneToOneSet tests cannot be run in parallel
 // or deadlocks can occur.
@@ -137,11 +137,13 @@ func TestToManyAdd(t *testing.T) {
 	t.Run("PullRequestToApprovers", testPullRequestToManyAddOpApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManyAddOpCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManyAddOpIdlers)
+	t.Run("PullRequestToReviewers", testPullRequestToManyAddOpReviewers)
 	t.Run("UserToApprovedPullRequests", testUserToManyAddOpApprovedPullRequests)
 	t.Run("UserToCommentedPullRequests", testUserToManyAddOpCommentedPullRequests)
 	t.Run("UserToIdledPullRequests", testUserToManyAddOpIdledPullRequests)
 	t.Run("UserToProjects", testUserToManyAddOpProjects)
 	t.Run("UserToAuthoredPullRequests", testUserToManyAddOpAuthoredPullRequests)
+	t.Run("UserToRequestedReviews", testUserToManyAddOpRequestedReviews)
 }
 
 // TestToManySet tests cannot be run in parallel
@@ -151,11 +153,12 @@ func TestToManySet(t *testing.T) {
 	t.Run("PullRequestToApprovers", testPullRequestToManySetOpApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManySetOpCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManySetOpIdlers)
+	t.Run("PullRequestToReviewers", testPullRequestToManySetOpReviewers)
 	t.Run("UserToApprovedPullRequests", testUserToManySetOpApprovedPullRequests)
 	t.Run("UserToCommentedPullRequests", testUserToManySetOpCommentedPullRequests)
 	t.Run("UserToIdledPullRequests", testUserToManySetOpIdledPullRequests)
 	t.Run("UserToProjects", testUserToManySetOpProjects)
-	t.Run("UserToAuthoredPullRequests", testUserToManySetOpAuthoredPullRequests)
+	t.Run("UserToRequestedReviews", testUserToManySetOpRequestedReviews)
 }
 
 // TestToManyRemove tests cannot be run in parallel
@@ -165,11 +168,12 @@ func TestToManyRemove(t *testing.T) {
 	t.Run("PullRequestToApprovers", testPullRequestToManyRemoveOpApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManyRemoveOpCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManyRemoveOpIdlers)
+	t.Run("PullRequestToReviewers", testPullRequestToManyRemoveOpReviewers)
 	t.Run("UserToApprovedPullRequests", testUserToManyRemoveOpApprovedPullRequests)
 	t.Run("UserToCommentedPullRequests", testUserToManyRemoveOpCommentedPullRequests)
 	t.Run("UserToIdledPullRequests", testUserToManyRemoveOpIdledPullRequests)
 	t.Run("UserToProjects", testUserToManyRemoveOpProjects)
-	t.Run("UserToAuthoredPullRequests", testUserToManyRemoveOpAuthoredPullRequests)
+	t.Run("UserToRequestedReviews", testUserToManyRemoveOpRequestedReviews)
 }
 
 func TestReload(t *testing.T) {

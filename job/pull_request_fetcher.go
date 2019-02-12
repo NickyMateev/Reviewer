@@ -32,7 +32,7 @@ func (prf PullRequestFetcher) Name() string {
 
 // Period returns the period of time when the PullRequestFetcher job should execute
 func (prf PullRequestFetcher) Period() string {
-	return "10s"
+	return "30m"
 }
 
 // Run executes the PullRequestFetcher job

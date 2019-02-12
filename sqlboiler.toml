@@ -28,6 +28,10 @@ foreign = "Commenters"
 local = "IdledPullRequests"
 foreign = "Idlers"
 
+[aliases.tables.reviewers.relationships.reviewers_user_id_fkey]
+local = "RequestedReviews"
+foreign = "Reviewers"
+
 [[types]]
   [types.match]
     type = "int"

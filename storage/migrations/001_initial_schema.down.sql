@@ -7,5 +7,6 @@ DROP TABLE IF EXISTS pull_requests;
 DROP TABLE IF EXISTS approvers;
 DROP TABLE IF EXISTS commenters;
 DROP TABLE IF EXISTS idlers;
+DROP TABLE IF EXISTS reviewers;
 
 COMMIT;

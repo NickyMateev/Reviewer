@@ -24,9 +24,10 @@ CREATE TABLE project_users (
 
 CREATE TABLE pull_requests (
   id SERIAL PRIMARY KEY NOT NULL,
-  user_id INTEGER,
+  user_id INTEGER NOT NULL,
   title varchar(255) NOT NULL,
   url varchar(255) NOT NULL,
+  number INTEGER NOT NULL,
   github_id INTEGER NOT NULL,
   created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -51,10 +52,18 @@ CREATE TABLE commenters (
 
 CREATE TABLE idlers (
   user_id INTEGER,
-  pull_request_id  INTEGER,
+  pull_request_id INTEGER,
   PRIMARY KEY (user_id, pull_request_id),
   CONSTRAINT idlers_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT idlers_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES pull_requests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE reviewers (
+  user_id INTEGER,
+  pull_request_id INTEGER,
+  PRIMARY KEY (user_id, pull_request_id),
+  CONSTRAINT reviewers_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT reviewers_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES pull_requests(id) ON DELETE CASCADE
 );
 
 COMMIT;

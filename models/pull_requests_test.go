@@ -746,6 +746,90 @@ func testPullRequestToManyIdlers(t *testing.T) {
 	}
 }
 
+func testPullRequestToManyReviewers(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a PullRequest
+	var b, c User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, pullRequestDBTypes, true, pullRequestColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize PullRequest struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, userDBTypes, false, userColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, userDBTypes, false, userColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = tx.Exec("insert into \"reviewers\" (\"pull_request_id\", \"user_id\") values ($1, $2)", a.ID, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec("insert into \"reviewers\" (\"pull_request_id\", \"user_id\") values ($1, $2)", a.ID, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.Reviewers().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if v.ID == b.ID {
+			bFound = true
+		}
+		if v.ID == c.ID {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := PullRequestSlice{&a}
+	if err = a.L.LoadReviewers(ctx, tx, false, (*[]*PullRequest)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Reviewers); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.Reviewers = nil
+	if err = a.L.LoadReviewers(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Reviewers); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
 func testPullRequestToManyAddOpApprovers(t *testing.T) {
 	var err error
 
@@ -1430,6 +1514,234 @@ func testPullRequestToManyRemoveOpIdlers(t *testing.T) {
 	}
 }
 
+func testPullRequestToManyAddOpReviewers(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a PullRequest
+	var b, c, d, e User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, pullRequestDBTypes, false, strmangle.SetComplement(pullRequestPrimaryKeyColumns, pullRequestColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*User{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*User{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddReviewers(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if first.R.RequestedReviews[0] != &a {
+			t.Error("relationship was not added properly to the slice")
+		}
+		if second.R.RequestedReviews[0] != &a {
+			t.Error("relationship was not added properly to the slice")
+		}
+
+		if a.R.Reviewers[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.Reviewers[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.Reviewers().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testPullRequestToManySetOpReviewers(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a PullRequest
+	var b, c, d, e User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, pullRequestDBTypes, false, strmangle.SetComplement(pullRequestPrimaryKeyColumns, pullRequestColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*User{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetReviewers(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Reviewers().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetReviewers(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Reviewers().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	// The following checks cannot be implemented since we have no handle
+	// to these when we call Set(). Leaving them here as wishful thinking
+	// and to let people know there's dragons.
+	//
+	// if len(b.R.RequestedReviews) != 0 {
+	// 	t.Error("relationship was not removed properly from the slice")
+	// }
+	// if len(c.R.RequestedReviews) != 0 {
+	// 	t.Error("relationship was not removed properly from the slice")
+	// }
+	if d.R.RequestedReviews[0] != &a {
+		t.Error("relationship was not added properly to the slice")
+	}
+	if e.R.RequestedReviews[0] != &a {
+		t.Error("relationship was not added properly to the slice")
+	}
+
+	if a.R.Reviewers[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.Reviewers[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testPullRequestToManyRemoveOpReviewers(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a PullRequest
+	var b, c, d, e User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, pullRequestDBTypes, false, strmangle.SetComplement(pullRequestPrimaryKeyColumns, pullRequestColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*User{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddReviewers(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Reviewers().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveReviewers(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Reviewers().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if len(b.R.RequestedReviews) != 0 {
+		t.Error("relationship was not removed properly from the slice")
+	}
+	if len(c.R.RequestedReviews) != 0 {
+		t.Error("relationship was not removed properly from the slice")
+	}
+	if d.R.RequestedReviews[0] != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.RequestedReviews[0] != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if len(a.R.Reviewers) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.Reviewers[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.Reviewers[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
 func testPullRequestToOneUserUsingAuthor(t *testing.T) {
 	ctx := context.Background()
 	tx := MustTx(boil.BeginTx(ctx, nil))
@@ -1439,7 +1751,7 @@ func testPullRequestToOneUserUsingAuthor(t *testing.T) {
 	var foreign User
 
 	seed := randomize.NewSeed()
-	if err := randomize.Struct(seed, &local, pullRequestDBTypes, true, pullRequestColumnsWithDefault...); err != nil {
+	if err := randomize.Struct(seed, &local, pullRequestDBTypes, false, pullRequestColumnsWithDefault...); err != nil {
 		t.Errorf("Unable to randomize PullRequest struct: %s", err)
 	}
 	if err := randomize.Struct(seed, &foreign, userDBTypes, false, userColumnsWithDefault...); err != nil {
@@ -1450,7 +1762,7 @@ func testPullRequestToOneUserUsingAuthor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	queries.Assign(&local.UserID, foreign.ID)
+	local.UserID = foreign.ID
 	if err := local.Insert(ctx, tx, boil.Infer()); err != nil {
 		t.Fatal(err)
 	}
@@ -1460,7 +1772,7 @@ func testPullRequestToOneUserUsingAuthor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !queries.Equal(check.ID, foreign.ID) {
+	if check.ID != foreign.ID {
 		t.Errorf("want: %v, got %v", foreign.ID, check.ID)
 	}
 
@@ -1522,7 +1834,7 @@ func testPullRequestToOneSetOpUserUsingAuthor(t *testing.T) {
 		if x.R.AuthoredPullRequests[0] != &a {
 			t.Error("failed to append to foreign relationship struct")
 		}
-		if !queries.Equal(a.UserID, x.ID) {
+		if a.UserID != x.ID {
 			t.Error("foreign key was wrong value", a.UserID)
 		}
 
@@ -1533,60 +1845,9 @@ func testPullRequestToOneSetOpUserUsingAuthor(t *testing.T) {
 			t.Fatal("failed to reload", err)
 		}
 
-		if !queries.Equal(a.UserID, x.ID) {
+		if a.UserID != x.ID {
 			t.Error("foreign key was wrong value", a.UserID, x.ID)
 		}
-	}
-}
-
-func testPullRequestToOneRemoveOpUserUsingAuthor(t *testing.T) {
-	var err error
-
-	ctx := context.Background()
-	tx := MustTx(boil.BeginTx(ctx, nil))
-	defer func() { _ = tx.Rollback() }()
-
-	var a PullRequest
-	var b User
-
-	seed := randomize.NewSeed()
-	if err = randomize.Struct(seed, &a, pullRequestDBTypes, false, strmangle.SetComplement(pullRequestPrimaryKeyColumns, pullRequestColumnsWithoutDefault)...); err != nil {
-		t.Fatal(err)
-	}
-	if err = randomize.Struct(seed, &b, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
-		t.Fatal(err)
-	}
-
-	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err = a.SetAuthor(ctx, tx, true, &b); err != nil {
-		t.Fatal(err)
-	}
-
-	if err = a.RemoveAuthor(ctx, tx, &b); err != nil {
-		t.Error("failed to remove relationship")
-	}
-
-	count, err := a.Author().Count(ctx, tx)
-	if err != nil {
-		t.Error(err)
-	}
-	if count != 0 {
-		t.Error("want no relationships remaining")
-	}
-
-	if a.R.Author != nil {
-		t.Error("R struct entry should be nil")
-	}
-
-	if !queries.IsValuerNil(a.UserID) {
-		t.Error("foreign key value should be nil")
-	}
-
-	if len(b.R.AuthoredPullRequests) != 0 {
-		t.Error("failed to remove a from b's relationships")
 	}
 }
 
@@ -1664,7 +1925,7 @@ func testPullRequestsSelect(t *testing.T) {
 }
 
 var (
-	pullRequestDBTypes = map[string]string{`ID`: `integer`, `UserID`: `integer`, `Title`: `character varying`, `URL`: `character varying`, `GithubID`: `integer`, `CreatedAt`: `timestamp without time zone`, `UpdatedAt`: `timestamp without time zone`}
+	pullRequestDBTypes = map[string]string{`ID`: `integer`, `UserID`: `integer`, `Title`: `character varying`, `URL`: `character varying`, `Number`: `integer`, `GithubID`: `integer`, `CreatedAt`: `timestamp without time zone`, `UpdatedAt`: `timestamp without time zone`}
 	_                  = bytes.MinRead
 )
 

@@ -60,12 +60,14 @@ var UserRels = struct {
 	IdledPullRequests     string
 	Projects              string
 	AuthoredPullRequests  string
+	RequestedReviews      string
 }{
 	ApprovedPullRequests:  "ApprovedPullRequests",
 	CommentedPullRequests: "CommentedPullRequests",
 	IdledPullRequests:     "IdledPullRequests",
 	Projects:              "Projects",
 	AuthoredPullRequests:  "AuthoredPullRequests",
+	RequestedReviews:      "RequestedReviews",
 }
 
 // userR is where relationships are stored.
@@ -75,6 +77,7 @@ type userR struct {
 	IdledPullRequests     PullRequestSlice
 	Projects              ProjectSlice
 	AuthoredPullRequests  PullRequestSlice
+	RequestedReviews      PullRequestSlice
 }
 
 // NewStruct creates a new relationship struct
@@ -476,6 +479,28 @@ func (o *User) AuthoredPullRequests(mods ...qm.QueryMod) pullRequestQuery {
 	return query
 }
 
+// RequestedReviews retrieves all the pull_request's PullRequests with an executor via id column.
+func (o *User) RequestedReviews(mods ...qm.QueryMod) pullRequestQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.InnerJoin("\"reviewers\" on \"pull_requests\".\"id\" = \"reviewers\".\"pull_request_id\""),
+		qm.Where("\"reviewers\".\"user_id\"=?", o.ID),
+	)
+
+	query := PullRequests(queryMods...)
+	queries.SetFrom(query.Query, "\"pull_requests\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"pull_requests\".*"})
+	}
+
+	return query
+}
+
 // LoadApprovedPullRequests allows an eager lookup of values, cached into the
 // loaded structs of the objects. This is for a 1-M or N-M relationship.
 func (userL) LoadApprovedPullRequests(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
@@ -537,7 +562,7 @@ func (userL) LoadApprovedPullRequests(ctx context.Context, e boil.ContextExecuto
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -652,7 +677,7 @@ func (userL) LoadCommentedPullRequests(ctx context.Context, e boil.ContextExecut
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -767,7 +792,7 @@ func (userL) LoadIdledPullRequests(ctx context.Context, e boil.ContextExecutor, 
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -962,7 +987,7 @@ func (userL) LoadAuthoredPullRequests(ctx context.Context, e boil.ContextExecuto
 			}
 
 			for _, a := range args {
-				if queries.Equal(a, obj.ID) {
+				if a == obj.ID {
 					continue Outer
 				}
 			}
@@ -1017,12 +1042,127 @@ func (userL) LoadAuthoredPullRequests(ctx context.Context, e boil.ContextExecuto
 
 	for _, foreign := range resultSlice {
 		for _, local := range slice {
-			if queries.Equal(local.ID, foreign.UserID) {
+			if local.ID == foreign.UserID {
 				local.R.AuthoredPullRequests = append(local.R.AuthoredPullRequests, foreign)
 				if foreign.R == nil {
 					foreign.R = &pullRequestR{}
 				}
 				foreign.R.Author = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadRequestedReviews allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (userL) LoadRequestedReviews(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
+	var slice []*User
+	var object *User
+
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+	}
+
+	args := make([]interface{}, 0, 1)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args = append(args, object.ID)
+	} else {
+	Outer:
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+
+			for _, a := range args {
+				if a == obj.ID {
+					continue Outer
+				}
+			}
+
+			args = append(args, obj.ID)
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	query := NewQuery(
+		qm.Select("\"pull_requests\".*, \"a\".\"user_id\""),
+		qm.From("\"pull_requests\""),
+		qm.InnerJoin("\"reviewers\" as \"a\" on \"pull_requests\".\"id\" = \"a\".\"pull_request_id\""),
+		qm.WhereIn("\"a\".\"user_id\" in ?", args...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load pull_requests")
+	}
+
+	var resultSlice []*PullRequest
+
+	var localJoinCols []int64
+	for results.Next() {
+		one := new(PullRequest)
+		var localJoinCol int64
+
+		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		if err != nil {
+			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
+		}
+		if err = results.Err(); err != nil {
+			return errors.Wrap(err, "failed to plebian-bind eager loaded slice pull_requests")
+		}
+
+		resultSlice = append(resultSlice, one)
+		localJoinCols = append(localJoinCols, localJoinCol)
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on pull_requests")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for pull_requests")
+	}
+
+	if len(pullRequestAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.RequestedReviews = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &pullRequestR{}
+			}
+			foreign.R.Reviewers = append(foreign.R.Reviewers, object)
+		}
+		return nil
+	}
+
+	for i, foreign := range resultSlice {
+		localJoinCol := localJoinCols[i]
+		for _, local := range slice {
+			if local.ID == localJoinCol {
+				local.R.RequestedReviews = append(local.R.RequestedReviews, foreign)
+				if foreign.R == nil {
+					foreign.R = &pullRequestR{}
+				}
+				foreign.R.Reviewers = append(foreign.R.Reviewers, local)
 				break
 			}
 		}
@@ -1599,7 +1739,7 @@ func (o *User) AddAuthoredPullRequests(ctx context.Context, exec boil.ContextExe
 	var err error
 	for _, rel := range related {
 		if insert {
-			queries.Assign(&rel.UserID, o.ID)
+			rel.UserID = o.ID
 			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
 				return errors.Wrap(err, "failed to insert into foreign table")
 			}
@@ -1620,7 +1760,7 @@ func (o *User) AddAuthoredPullRequests(ctx context.Context, exec boil.ContextExe
 				return errors.Wrap(err, "failed to update foreign table")
 			}
 
-			queries.Assign(&rel.UserID, o.ID)
+			rel.UserID = o.ID
 		}
 	}
 
@@ -1644,14 +1784,62 @@ func (o *User) AddAuthoredPullRequests(ctx context.Context, exec boil.ContextExe
 	return nil
 }
 
-// SetAuthoredPullRequests removes all previously related items of the
+// AddRequestedReviews adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.RequestedReviews.
+// Sets related.R.Reviewers appropriately.
+func (o *User) AddRequestedReviews(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*PullRequest) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		}
+	}
+
+	for _, rel := range related {
+		query := "insert into \"reviewers\" (\"user_id\", \"pull_request_id\") values ($1, $2)"
+		values := []interface{}{o.ID, rel.ID}
+
+		if boil.DebugMode {
+			fmt.Fprintln(boil.DebugWriter, query)
+			fmt.Fprintln(boil.DebugWriter, values)
+		}
+
+		_, err = exec.ExecContext(ctx, query, values...)
+		if err != nil {
+			return errors.Wrap(err, "failed to insert into join table")
+		}
+	}
+	if o.R == nil {
+		o.R = &userR{
+			RequestedReviews: related,
+		}
+	} else {
+		o.R.RequestedReviews = append(o.R.RequestedReviews, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &pullRequestR{
+				Reviewers: UserSlice{o},
+			}
+		} else {
+			rel.R.Reviewers = append(rel.R.Reviewers, o)
+		}
+	}
+	return nil
+}
+
+// SetRequestedReviews removes all previously related items of the
 // user replacing them completely with the passed
 // in related items, optionally inserting them as new records.
-// Sets o.R.Author's AuthoredPullRequests accordingly.
-// Replaces o.R.AuthoredPullRequests with related.
-// Sets related.R.Author's AuthoredPullRequests accordingly.
-func (o *User) SetAuthoredPullRequests(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*PullRequest) error {
-	query := "update \"pull_requests\" set \"user_id\" = null where \"user_id\" = $1"
+// Sets o.R.Reviewers's RequestedReviews accordingly.
+// Replaces o.R.RequestedReviews with related.
+// Sets related.R.Reviewers's RequestedReviews accordingly.
+func (o *User) SetRequestedReviews(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*PullRequest) error {
+	query := "delete from \"reviewers\" where \"user_id\" = $1"
 	values := []interface{}{o.ID}
 	if boil.DebugMode {
 		fmt.Fprintln(boil.DebugWriter, query)
@@ -1663,55 +1851,77 @@ func (o *User) SetAuthoredPullRequests(ctx context.Context, exec boil.ContextExe
 		return errors.Wrap(err, "failed to remove relationships before set")
 	}
 
+	removeRequestedReviewsFromReviewersSlice(o, related)
 	if o.R != nil {
-		for _, rel := range o.R.AuthoredPullRequests {
-			queries.SetScanner(&rel.UserID, nil)
-			if rel.R == nil {
-				continue
-			}
-
-			rel.R.Author = nil
-		}
-
-		o.R.AuthoredPullRequests = nil
+		o.R.RequestedReviews = nil
 	}
-	return o.AddAuthoredPullRequests(ctx, exec, insert, related...)
+	return o.AddRequestedReviews(ctx, exec, insert, related...)
 }
 
-// RemoveAuthoredPullRequests relationships from objects passed in.
-// Removes related items from R.AuthoredPullRequests (uses pointer comparison, removal does not keep order)
-// Sets related.R.Author.
-func (o *User) RemoveAuthoredPullRequests(ctx context.Context, exec boil.ContextExecutor, related ...*PullRequest) error {
+// RemoveRequestedReviews relationships from objects passed in.
+// Removes related items from R.RequestedReviews (uses pointer comparison, removal does not keep order)
+// Sets related.R.Reviewers.
+func (o *User) RemoveRequestedReviews(ctx context.Context, exec boil.ContextExecutor, related ...*PullRequest) error {
 	var err error
+	query := fmt.Sprintf(
+		"delete from \"reviewers\" where \"user_id\" = $1 and \"pull_request_id\" in (%s)",
+		strmangle.Placeholders(dialect.UseIndexPlaceholders, len(related), 2, 1),
+	)
+	values := []interface{}{o.ID}
 	for _, rel := range related {
-		queries.SetScanner(&rel.UserID, nil)
-		if rel.R != nil {
-			rel.R.Author = nil
-		}
-		if _, err = rel.Update(ctx, exec, boil.Whitelist("user_id")); err != nil {
-			return err
-		}
+		values = append(values, rel.ID)
 	}
+
+	if boil.DebugMode {
+		fmt.Fprintln(boil.DebugWriter, query)
+		fmt.Fprintln(boil.DebugWriter, values)
+	}
+
+	_, err = exec.ExecContext(ctx, query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+	removeRequestedReviewsFromReviewersSlice(o, related)
 	if o.R == nil {
 		return nil
 	}
 
 	for _, rel := range related {
-		for i, ri := range o.R.AuthoredPullRequests {
+		for i, ri := range o.R.RequestedReviews {
 			if rel != ri {
 				continue
 			}
 
-			ln := len(o.R.AuthoredPullRequests)
+			ln := len(o.R.RequestedReviews)
 			if ln > 1 && i < ln-1 {
-				o.R.AuthoredPullRequests[i] = o.R.AuthoredPullRequests[ln-1]
+				o.R.RequestedReviews[i] = o.R.RequestedReviews[ln-1]
 			}
-			o.R.AuthoredPullRequests = o.R.AuthoredPullRequests[:ln-1]
+			o.R.RequestedReviews = o.R.RequestedReviews[:ln-1]
 			break
 		}
 	}
 
 	return nil
+}
+
+func removeRequestedReviewsFromReviewersSlice(o *User, related []*PullRequest) {
+	for _, rel := range related {
+		if rel.R == nil {
+			continue
+		}
+		for i, ri := range rel.R.Reviewers {
+			if o.ID != ri.ID {
+				continue
+			}
+
+			ln := len(rel.R.Reviewers)
+			if ln > 1 && i < ln-1 {
+				rel.R.Reviewers[i] = rel.R.Reviewers[ln-1]
+			}
+			rel.R.Reviewers = rel.R.Reviewers[:ln-1]
+			break
+		}
+	}
 }
 
 // Users retrieves all the records using an executor.
