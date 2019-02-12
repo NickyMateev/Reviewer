@@ -5,6 +5,7 @@ import (
 	"github.com/NickyMateev/Reviewer/api"
 	"github.com/NickyMateev/Reviewer/job"
 	"github.com/NickyMateev/Reviewer/web"
+	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
 	"github.com/robfig/cron"
 	"log"
@@ -28,12 +29,12 @@ type Config struct {
 }
 
 // New creates a new Server instance
-func New(cfg Config, db *sql.DB) (*Server, error) {
+func New(cfg Config, db *sql.DB, client *github.Client) (*Server, error) {
 	return &Server{
 		Config:       cfg,
 		DB:           db,
 		API:          api.Default(db),
-		JobContainer: job.DefaultContainer(db),
+		JobContainer: job.DefaultContainer(db, client),
 	}, nil
 }
 

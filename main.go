@@ -4,6 +4,7 @@ import (
 	"github.com/NickyMateev/Reviewer/config"
 	"github.com/NickyMateev/Reviewer/server"
 	"github.com/NickyMateev/Reviewer/storage"
+	"github.com/google/go-github/github"
 )
 
 func main() {
@@ -14,7 +15,7 @@ func main() {
 		panic(err)
 	}
 
-	srv, err := server.New(config.Server, db)
+	srv, err := server.New(config.Server, db, github.NewClient(nil))
 	if err != nil {
 		panic(err)
 	}
