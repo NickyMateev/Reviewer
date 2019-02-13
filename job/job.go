@@ -8,6 +8,7 @@ import (
 
 const (
 	pullRequestFetcher = "PullRequestFetcher"
+	reviewFetcher      = "ReviewFetcher"
 )
 
 // Job defines a task that will be executed periodically
@@ -39,5 +40,6 @@ func DefaultContainer(db *sql.DB, client *github.Client) Container {
 func (jc defaultContainer) Jobs() []Job {
 	return []Job{
 		NewPullRequestFetcher(jc.db, jc.client),
+		NewReviewFetcher(jc.db, jc.client),
 	}
 }

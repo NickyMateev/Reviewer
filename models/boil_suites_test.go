@@ -90,6 +90,7 @@ func TestInsert(t *testing.T) {
 // or deadlocks can occur.
 func TestToOne(t *testing.T) {
 	t.Run("PullRequestToUserUsingAuthor", testPullRequestToOneUserUsingAuthor)
+	t.Run("PullRequestToProjectUsingProject", testPullRequestToOneProjectUsingProject)
 }
 
 // TestOneToOne tests cannot be run in parallel
@@ -100,6 +101,7 @@ func TestOneToOne(t *testing.T) {}
 // or deadlocks can occur.
 func TestToMany(t *testing.T) {
 	t.Run("ProjectToContributors", testProjectToManyContributors)
+	t.Run("ProjectToPullRequests", testProjectToManyPullRequests)
 	t.Run("PullRequestToApprovers", testPullRequestToManyApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManyCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManyIdlers)
@@ -116,6 +118,7 @@ func TestToMany(t *testing.T) {
 // or deadlocks can occur.
 func TestToOneSet(t *testing.T) {
 	t.Run("PullRequestToUserUsingAuthoredPullRequests", testPullRequestToOneSetOpUserUsingAuthor)
+	t.Run("PullRequestToProjectUsingPullRequests", testPullRequestToOneSetOpProjectUsingProject)
 }
 
 // TestToOneRemove tests cannot be run in parallel
@@ -134,6 +137,7 @@ func TestOneToOneRemove(t *testing.T) {}
 // or deadlocks can occur.
 func TestToManyAdd(t *testing.T) {
 	t.Run("ProjectToContributors", testProjectToManyAddOpContributors)
+	t.Run("ProjectToPullRequests", testProjectToManyAddOpPullRequests)
 	t.Run("PullRequestToApprovers", testPullRequestToManyAddOpApprovers)
 	t.Run("PullRequestToCommenters", testPullRequestToManyAddOpCommenters)
 	t.Run("PullRequestToIdlers", testPullRequestToManyAddOpIdlers)

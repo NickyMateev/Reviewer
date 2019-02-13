@@ -25,6 +25,7 @@ import (
 type PullRequest struct {
 	ID        int64     `boil:"id" json:"id" toml:"id" yaml:"id"`
 	UserID    int64     `boil:"user_id" json:"user_id" toml:"user_id" yaml:"user_id"`
+	ProjectID int64     `boil:"project_id" json:"project_id" toml:"project_id" yaml:"project_id"`
 	Title     string    `boil:"title" json:"title" toml:"title" yaml:"title"`
 	URL       string    `boil:"url" json:"url" toml:"url" yaml:"url"`
 	Number    int64     `boil:"number" json:"number" toml:"number" yaml:"number"`
@@ -39,6 +40,7 @@ type PullRequest struct {
 var PullRequestColumns = struct {
 	ID        string
 	UserID    string
+	ProjectID string
 	Title     string
 	URL       string
 	Number    string
@@ -48,6 +50,7 @@ var PullRequestColumns = struct {
 }{
 	ID:        "id",
 	UserID:    "user_id",
+	ProjectID: "project_id",
 	Title:     "title",
 	URL:       "url",
 	Number:    "number",
@@ -82,6 +85,7 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 var PullRequestWhere = struct {
 	ID        whereHelperint64
 	UserID    whereHelperint64
+	ProjectID whereHelperint64
 	Title     whereHelperstring
 	URL       whereHelperstring
 	Number    whereHelperint64
@@ -91,6 +95,7 @@ var PullRequestWhere = struct {
 }{
 	ID:        whereHelperint64{field: `id`},
 	UserID:    whereHelperint64{field: `user_id`},
+	ProjectID: whereHelperint64{field: `project_id`},
 	Title:     whereHelperstring{field: `title`},
 	URL:       whereHelperstring{field: `url`},
 	Number:    whereHelperint64{field: `number`},
@@ -102,12 +107,14 @@ var PullRequestWhere = struct {
 // PullRequestRels is where relationship names are stored.
 var PullRequestRels = struct {
 	Author     string
+	Project    string
 	Approvers  string
 	Commenters string
 	Idlers     string
 	Reviewers  string
 }{
 	Author:     "Author",
+	Project:    "Project",
 	Approvers:  "Approvers",
 	Commenters: "Commenters",
 	Idlers:     "Idlers",
@@ -117,6 +124,7 @@ var PullRequestRels = struct {
 // pullRequestR is where relationships are stored.
 type pullRequestR struct {
 	Author     *User
+	Project    *Project
 	Approvers  UserSlice
 	Commenters UserSlice
 	Idlers     UserSlice
@@ -132,8 +140,8 @@ func (*pullRequestR) NewStruct() *pullRequestR {
 type pullRequestL struct{}
 
 var (
-	pullRequestColumns               = []string{"id", "user_id", "title", "url", "number", "github_id", "created_at", "updated_at"}
-	pullRequestColumnsWithoutDefault = []string{"user_id", "title", "url", "number", "github_id"}
+	pullRequestColumns               = []string{"id", "user_id", "project_id", "title", "url", "number", "github_id", "created_at", "updated_at"}
+	pullRequestColumnsWithoutDefault = []string{"user_id", "project_id", "title", "url", "number", "github_id"}
 	pullRequestColumnsWithDefault    = []string{"id", "created_at", "updated_at"}
 	pullRequestPrimaryKeyColumns     = []string{"id"}
 )
@@ -427,6 +435,20 @@ func (o *PullRequest) Author(mods ...qm.QueryMod) userQuery {
 	return query
 }
 
+// Project pointed to by the foreign key.
+func (o *PullRequest) Project(mods ...qm.QueryMod) projectQuery {
+	queryMods := []qm.QueryMod{
+		qm.Where("id=?", o.ProjectID),
+	}
+
+	queryMods = append(queryMods, mods...)
+
+	query := Projects(queryMods...)
+	queries.SetFrom(query.Query, "\"projects\"")
+
+	return query
+}
+
 // Approvers retrieves all the user's Users with an executor via id column.
 func (o *PullRequest) Approvers(mods ...qm.QueryMod) userQuery {
 	var queryMods []qm.QueryMod
@@ -608,6 +630,107 @@ func (pullRequestL) LoadAuthor(ctx context.Context, e boil.ContextExecutor, sing
 					foreign.R = &userR{}
 				}
 				foreign.R.AuthoredPullRequests = append(foreign.R.AuthoredPullRequests, local)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadProject allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for an N-1 relationship.
+func (pullRequestL) LoadProject(ctx context.Context, e boil.ContextExecutor, singular bool, maybePullRequest interface{}, mods queries.Applicator) error {
+	var slice []*PullRequest
+	var object *PullRequest
+
+	if singular {
+		object = maybePullRequest.(*PullRequest)
+	} else {
+		slice = *maybePullRequest.(*[]*PullRequest)
+	}
+
+	args := make([]interface{}, 0, 1)
+	if singular {
+		if object.R == nil {
+			object.R = &pullRequestR{}
+		}
+		args = append(args, object.ProjectID)
+
+	} else {
+	Outer:
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &pullRequestR{}
+			}
+
+			for _, a := range args {
+				if a == obj.ProjectID {
+					continue Outer
+				}
+			}
+
+			args = append(args, obj.ProjectID)
+
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	query := NewQuery(qm.From(`projects`), qm.WhereIn(`id in ?`, args...))
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load Project")
+	}
+
+	var resultSlice []*Project
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice Project")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results of eager load for projects")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for projects")
+	}
+
+	if len(pullRequestAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(resultSlice) == 0 {
+		return nil
+	}
+
+	if singular {
+		foreign := resultSlice[0]
+		object.R.Project = foreign
+		if foreign.R == nil {
+			foreign.R = &projectR{}
+		}
+		foreign.R.PullRequests = append(foreign.R.PullRequests, object)
+		return nil
+	}
+
+	for _, local := range slice {
+		for _, foreign := range resultSlice {
+			if local.ProjectID == foreign.ID {
+				local.R.Project = foreign
+				if foreign.R == nil {
+					foreign.R = &projectR{}
+				}
+				foreign.R.PullRequests = append(foreign.R.PullRequests, local)
 				break
 			}
 		}
@@ -1118,6 +1241,53 @@ func (o *PullRequest) SetAuthor(ctx context.Context, exec boil.ContextExecutor, 
 		}
 	} else {
 		related.R.AuthoredPullRequests = append(related.R.AuthoredPullRequests, o)
+	}
+
+	return nil
+}
+
+// SetProject of the pullRequest to the related item.
+// Sets o.R.Project to related.
+// Adds o to related.R.PullRequests.
+func (o *PullRequest) SetProject(ctx context.Context, exec boil.ContextExecutor, insert bool, related *Project) error {
+	var err error
+	if insert {
+		if err = related.Insert(ctx, exec, boil.Infer()); err != nil {
+			return errors.Wrap(err, "failed to insert into foreign table")
+		}
+	}
+
+	updateQuery := fmt.Sprintf(
+		"UPDATE \"pull_requests\" SET %s WHERE %s",
+		strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
+		strmangle.WhereClause("\"", "\"", 2, pullRequestPrimaryKeyColumns),
+	)
+	values := []interface{}{related.ID, o.ID}
+
+	if boil.DebugMode {
+		fmt.Fprintln(boil.DebugWriter, updateQuery)
+		fmt.Fprintln(boil.DebugWriter, values)
+	}
+
+	if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	o.ProjectID = related.ID
+	if o.R == nil {
+		o.R = &pullRequestR{
+			Project: related,
+		}
+	} else {
+		o.R.Project = related
+	}
+
+	if related.R == nil {
+		related.R = &projectR{
+			PullRequests: PullRequestSlice{o},
+		}
+	} else {
+		related.R.PullRequests = append(related.R.PullRequests, o)
 	}
 
 	return nil

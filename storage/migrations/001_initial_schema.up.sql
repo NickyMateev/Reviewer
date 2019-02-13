@@ -25,13 +25,15 @@ CREATE TABLE project_users (
 CREATE TABLE pull_requests (
   id SERIAL PRIMARY KEY NOT NULL,
   user_id INTEGER NOT NULL,
+  project_id INTEGER NOT NULL,
   title varchar(255) NOT NULL,
   url varchar(255) NOT NULL,
   number INTEGER NOT NULL,
   github_id INTEGER NOT NULL,
   created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT pull_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT pull_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT pull_requests_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 CREATE TABLE approvers (

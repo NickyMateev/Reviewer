@@ -562,7 +562,7 @@ func (userL) LoadApprovedPullRequests(ctx context.Context, e boil.ContextExecuto
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.ProjectID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -677,7 +677,7 @@ func (userL) LoadCommentedPullRequests(ctx context.Context, e boil.ContextExecut
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.ProjectID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -792,7 +792,7 @@ func (userL) LoadIdledPullRequests(ctx context.Context, e boil.ContextExecutor, 
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.ProjectID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}
@@ -1117,7 +1117,7 @@ func (userL) LoadRequestedReviews(ctx context.Context, e boil.ContextExecutor, s
 		one := new(PullRequest)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.UserID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
+		err = results.Scan(&one.ID, &one.UserID, &one.ProjectID, &one.Title, &one.URL, &one.Number, &one.GithubID, &one.CreatedAt, &one.UpdatedAt, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for pull_requests")
 		}

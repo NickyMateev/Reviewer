@@ -1793,6 +1793,57 @@ func testPullRequestToOneUserUsingAuthor(t *testing.T) {
 	}
 }
 
+func testPullRequestToOneProjectUsingProject(t *testing.T) {
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var local PullRequest
+	var foreign Project
+
+	seed := randomize.NewSeed()
+	if err := randomize.Struct(seed, &local, pullRequestDBTypes, false, pullRequestColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize PullRequest struct: %s", err)
+	}
+	if err := randomize.Struct(seed, &foreign, projectDBTypes, false, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+
+	if err := foreign.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	local.ProjectID = foreign.ID
+	if err := local.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := local.Project().One(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if check.ID != foreign.ID {
+		t.Errorf("want: %v, got %v", foreign.ID, check.ID)
+	}
+
+	slice := PullRequestSlice{&local}
+	if err = local.L.LoadProject(ctx, tx, false, (*[]*PullRequest)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Project == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	local.R.Project = nil
+	if err = local.L.LoadProject(ctx, tx, true, &local, nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Project == nil {
+		t.Error("struct should have been eager loaded")
+	}
+}
+
 func testPullRequestToOneSetOpUserUsingAuthor(t *testing.T) {
 	var err error
 
@@ -1847,6 +1898,63 @@ func testPullRequestToOneSetOpUserUsingAuthor(t *testing.T) {
 
 		if a.UserID != x.ID {
 			t.Error("foreign key was wrong value", a.UserID, x.ID)
+		}
+	}
+}
+func testPullRequestToOneSetOpProjectUsingProject(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a PullRequest
+	var b, c Project
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, pullRequestDBTypes, false, strmangle.SetComplement(pullRequestPrimaryKeyColumns, pullRequestColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, x := range []*Project{&b, &c} {
+		err = a.SetProject(ctx, tx, i != 0, x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if a.R.Project != x {
+			t.Error("relationship struct not set to correct value")
+		}
+
+		if x.R.PullRequests[0] != &a {
+			t.Error("failed to append to foreign relationship struct")
+		}
+		if a.ProjectID != x.ID {
+			t.Error("foreign key was wrong value", a.ProjectID)
+		}
+
+		zero := reflect.Zero(reflect.TypeOf(a.ProjectID))
+		reflect.Indirect(reflect.ValueOf(&a.ProjectID)).Set(zero)
+
+		if err = a.Reload(ctx, tx); err != nil {
+			t.Fatal("failed to reload", err)
+		}
+
+		if a.ProjectID != x.ID {
+			t.Error("foreign key was wrong value", a.ProjectID, x.ID)
 		}
 	}
 }
@@ -1925,7 +2033,7 @@ func testPullRequestsSelect(t *testing.T) {
 }
 
 var (
-	pullRequestDBTypes = map[string]string{`ID`: `integer`, `UserID`: `integer`, `Title`: `character varying`, `URL`: `character varying`, `Number`: `integer`, `GithubID`: `integer`, `CreatedAt`: `timestamp without time zone`, `UpdatedAt`: `timestamp without time zone`}
+	pullRequestDBTypes = map[string]string{`ID`: `integer`, `UserID`: `integer`, `ProjectID`: `integer`, `Title`: `character varying`, `URL`: `character varying`, `Number`: `integer`, `GithubID`: `integer`, `CreatedAt`: `timestamp without time zone`, `UpdatedAt`: `timestamp without time zone`}
 	_                  = bytes.MinRead
 )
 
