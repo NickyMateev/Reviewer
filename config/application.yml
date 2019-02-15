@@ -1,0 +1,9 @@
+server:
+  port: 8888
+  request_timeout: 4000ms
+storage:
+  type: postgres
+  uri: postgres://user:password@domain:5432/postgres
+slack:
+  channel_id: CG1234567
+  bot_token: abc
