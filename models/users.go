@@ -19,13 +19,15 @@ import (
 	"github.com/volatiletech/sqlboiler/queries/qm"
 	"github.com/volatiletech/sqlboiler/queries/qmhelper"
 	"github.com/volatiletech/sqlboiler/strmangle"
+	"github.com/volatiletech/sqlboiler/types"
 )
 
 // User is an object representing the database table.
 type User struct {
-	ID       int64  `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Username string `boil:"username" json:"username" toml:"username" yaml:"username"`
-	GithubID int64  `boil:"github_id" json:"github_id" toml:"github_id" yaml:"github_id"`
+	ID       int64      `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Username string     `boil:"username" json:"username" toml:"username" yaml:"username"`
+	GithubID int64      `boil:"github_id" json:"github_id" toml:"github_id" yaml:"github_id"`
+	Metadata types.JSON `boil:"metadata" json:"metadata" toml:"metadata" yaml:"metadata"`
 
 	R *userR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L userL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -35,22 +37,47 @@ var UserColumns = struct {
 	ID       string
 	Username string
 	GithubID string
+	Metadata string
 }{
 	ID:       "id",
 	Username: "username",
 	GithubID: "github_id",
+	Metadata: "metadata",
 }
 
 // Generated where
+
+type whereHelpertypes_JSON struct{ field string }
+
+func (w whereHelpertypes_JSON) EQ(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.EQ, x)
+}
+func (w whereHelpertypes_JSON) NEQ(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.NEQ, x)
+}
+func (w whereHelpertypes_JSON) LT(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpertypes_JSON) LTE(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpertypes_JSON) GT(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpertypes_JSON) GTE(x types.JSON) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
 
 var UserWhere = struct {
 	ID       whereHelperint64
 	Username whereHelperstring
 	GithubID whereHelperint64
+	Metadata whereHelpertypes_JSON
 }{
 	ID:       whereHelperint64{field: `id`},
 	Username: whereHelperstring{field: `username`},
 	GithubID: whereHelperint64{field: `github_id`},
+	Metadata: whereHelpertypes_JSON{field: `metadata`},
 }
 
 // UserRels is where relationship names are stored.
@@ -89,9 +116,9 @@ func (*userR) NewStruct() *userR {
 type userL struct{}
 
 var (
-	userColumns               = []string{"id", "username", "github_id"}
+	userColumns               = []string{"id", "username", "github_id", "metadata"}
 	userColumnsWithoutDefault = []string{"username", "github_id"}
-	userColumnsWithDefault    = []string{"id"}
+	userColumnsWithDefault    = []string{"id", "metadata"}
 	userPrimaryKeyColumns     = []string{"id"}
 )
 

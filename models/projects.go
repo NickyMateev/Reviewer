@@ -485,7 +485,7 @@ func (projectL) LoadContributors(ctx context.Context, e boil.ContextExecutor, si
 		one := new(User)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &localJoinCol)
+		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &one.Metadata, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for users")
 		}

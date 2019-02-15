@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/NickyMateev/Reviewer/job"
 	"github.com/NickyMateev/Reviewer/server"
 	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/spf13/viper"
@@ -10,6 +11,7 @@ import (
 type Settings struct {
 	Storage storage.Config
 	Server  server.Config
+	Slack   job.SlackConfig
 }
 
 // New creates an instance of the application's configuration
@@ -33,6 +35,10 @@ func New() (*Settings, error) {
 		Server: server.Config{
 			Port:           v.GetInt("server.port"),
 			RequestTimeout: v.GetDuration("server.request_timeout"),
+		},
+		Slack: job.SlackConfig{
+			ChannelID: v.GetString("slack.channel_id"),
+			BotToken:  v.GetString("slack.bot_token"),
 		},
 	}, nil
 }

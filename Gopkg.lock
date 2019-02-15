@@ -2,6 +2,19 @@
 
 
 [[projects]]
+  digest = "1:1b487fd946176530c6c3669e55108e4ee45e1bd1ea0a630e28e3a173352d93e8"
+  name = "github.com/ericlagergren/decimal"
+  packages = [
+    ".",
+    "internal/arith",
+    "internal/arith/checked",
+    "internal/c",
+  ]
+  pruneopts = "UT"
+  revision = "73749d4874d5d3efba704f6046eae0517f998f4e"
+  version = "v3.3.1"
+
+[[projects]]
   digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -56,6 +69,14 @@
   version = "v1.7.0"
 
 [[projects]]
+  digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
+  version = "v1.4.0"
+
+[[projects]]
   digest = "1:c0d19ab64b32ce9fe5cf4ddceba78d5bc9807f0016db6b1183599da3dcc24d10"
   name = "github.com/hashicorp/hcl"
   packages = [
@@ -108,6 +129,17 @@
   pruneopts = "UT"
   revision = "3536a929edddb9a5b34bd6861dc4a9647cb459fe"
   version = "v1.1.2"
+
+[[projects]]
+  digest = "1:7711bc85fa91b919713feda232ffe0bd4ebb0e8426b9c0de6c6f476e0eb9b7c2"
+  name = "github.com/nlopes/slack"
+  packages = [
+    ".",
+    "slackutilsx",
+  ]
+  pruneopts = "UT"
+  revision = "a7deeca7935c178aa865249bab511daf816288ba"
+  version = "v0.5.0"
 
 [[projects]]
   digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
@@ -196,7 +228,7 @@
   version = "v8.0.0"
 
 [[projects]]
-  digest = "1:6d4e12292f2e46273d392ac07c7667ae3a3b9e1e6bed98342482d260211ff2ac"
+  digest = "1:42f4a818f071231a4f4ded424393d864c3149786ccc0ec80a7262e74abc0a127"
   name = "github.com/volatiletech/sqlboiler"
   packages = [
     "boil",
@@ -208,6 +240,7 @@
     "queries/qmhelper",
     "randomize",
     "strmangle",
+    "types",
   ]
   pruneopts = "UT"
   revision = "df8550538fefdf62f2520e74dbfad73f1bcb84a2"
@@ -255,10 +288,10 @@
     "github.com/gorilla/mux",
     "github.com/kat-co/vala",
     "github.com/lib/pq",
+    "github.com/nlopes/slack",
     "github.com/pkg/errors",
     "github.com/robfig/cron",
     "github.com/spf13/viper",
-    "github.com/volatiletech/null",
     "github.com/volatiletech/sqlboiler/boil",
     "github.com/volatiletech/sqlboiler/drivers",
     "github.com/volatiletech/sqlboiler/drivers/sqlboiler-psql/driver",
@@ -267,6 +300,7 @@
     "github.com/volatiletech/sqlboiler/queries/qmhelper",
     "github.com/volatiletech/sqlboiler/randomize",
     "github.com/volatiletech/sqlboiler/strmangle",
+    "github.com/volatiletech/sqlboiler/types",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

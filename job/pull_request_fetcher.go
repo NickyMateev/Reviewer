@@ -35,12 +35,13 @@ func (prf *PullRequestFetcher) Name() string {
 
 // Period returns the period of time when the PullRequestFetcher job should execute
 func (prf *PullRequestFetcher) Period() string {
-	return "1h30m"
+	return "@every 1h30m"
 }
 
 // Run executes the PullRequestFetcher job
 func (prf *PullRequestFetcher) Run() {
 	log.Printf("STARTING %v job", prf.Name())
+	defer log.Printf("FINISHED %v job", prf.Name())
 
 	projects, err := models.Projects().All(context.Background(), prf.db)
 	if err != nil {
@@ -63,8 +64,6 @@ func (prf *PullRequestFetcher) Run() {
 		go prf.fetchPullRequests(pullRequests, project.ID, projectName, &wg)
 	}
 	wg.Wait()
-
-	log.Printf("FINISHED %v job", prf.Name())
 }
 
 func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {

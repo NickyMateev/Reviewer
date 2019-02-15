@@ -10,6 +10,11 @@ import (
 	"log"
 )
 
+type SlackConfig struct {
+	ChannelID string
+	BotToken  string
+}
+
 func transformUser(githubUser *github.User, db *sql.DB) *models.User {
 	exists, err := models.Users(qm.Where("github_id = ?", githubUser.GetID())).Exists(context.Background(), db)
 	if err != nil {

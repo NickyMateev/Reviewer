@@ -34,12 +34,13 @@ func (rf *ReviewFetcher) Name() string {
 
 // Period returns the period of time when the ReviewFetcher job should execute
 func (rf *ReviewFetcher) Period() string {
-	return "15m"
+	return "@every 15m"
 }
 
 // Run executes the ReviewFetcher job
 func (rf *ReviewFetcher) Run() {
 	log.Printf("STARTING %v job", rf.Name())
+	defer log.Printf("FINISHED %v job", rf.Name())
 
 	pullRequests, err := models.PullRequests(qm.Load("Project"), qm.Load("Reviewers")).All(context.Background(), rf.db)
 	if err != nil {
@@ -62,7 +63,6 @@ func (rf *ReviewFetcher) Run() {
 				exists, err := user.ApprovedPullRequests(qm.Where("pull_request_id = ?", pr.ID)).Exists(context.Background(), rf.db)
 				if err != nil {
 					log.Panic("Unable to check pull request activity record:", err)
-
 				}
 				if !exists {
 					err = user.AddApprovedPullRequests(context.Background(), rf.db, false, pr)
@@ -71,7 +71,6 @@ func (rf *ReviewFetcher) Run() {
 				exists, err := user.CommentedPullRequests(qm.Where("pull_request_id = ?", pr.ID)).Exists(context.Background(), rf.db)
 				if err != nil {
 					log.Panic("Unable to check pull request activity record:", err)
-
 				}
 				if !exists {
 					err = user.AddCommentedPullRequests(context.Background(), rf.db, false, pr)
@@ -87,8 +86,6 @@ func (rf *ReviewFetcher) Run() {
 
 		pr.Update(context.Background(), rf.db, boil.Infer()) // updates the 'updated_at' column
 	}
-
-	log.Printf("FINISHED %v job", rf.Name())
 }
 
 func (rf *ReviewFetcher) findIdlers(requestedReviewers, actualReviewers []*models.User) []*models.User {

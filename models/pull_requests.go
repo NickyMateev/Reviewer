@@ -800,7 +800,7 @@ func (pullRequestL) LoadApprovers(ctx context.Context, e boil.ContextExecutor, s
 		one := new(User)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &localJoinCol)
+		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &one.Metadata, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for users")
 		}
@@ -915,7 +915,7 @@ func (pullRequestL) LoadCommenters(ctx context.Context, e boil.ContextExecutor, 
 		one := new(User)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &localJoinCol)
+		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &one.Metadata, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for users")
 		}
@@ -1030,7 +1030,7 @@ func (pullRequestL) LoadIdlers(ctx context.Context, e boil.ContextExecutor, sing
 		one := new(User)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &localJoinCol)
+		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &one.Metadata, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for users")
 		}
@@ -1145,7 +1145,7 @@ func (pullRequestL) LoadReviewers(ctx context.Context, e boil.ContextExecutor, s
 		one := new(User)
 		var localJoinCol int64
 
-		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &localJoinCol)
+		err = results.Scan(&one.ID, &one.Username, &one.GithubID, &one.Metadata, &localJoinCol)
 		if err != nil {
 			return errors.Wrap(err, "failed to scan eager loaded results for users")
 		}

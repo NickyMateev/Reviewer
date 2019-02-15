@@ -29,12 +29,12 @@ type Config struct {
 }
 
 // New creates a new Server instance
-func New(cfg Config, db *sql.DB, client *github.Client) (*Server, error) {
+func New(cfg Config, db *sql.DB, client *github.Client, slackConfig job.SlackConfig) (*Server, error) {
 	return &Server{
 		Config:       cfg,
 		DB:           db,
 		API:          api.Default(db),
-		JobContainer: job.DefaultContainer(db, client),
+		JobContainer: job.DefaultContainer(db, client, slackConfig),
 	}, nil
 }
 
@@ -79,7 +79,7 @@ func (s Server) startJobs() error {
 
 	scheduler := cron.New()
 	for _, job := range jobs {
-		err := scheduler.AddJob("@every "+job.Period(), job)
+		err := scheduler.AddJob(job.Period(), job)
 		if err != nil {
 			return err
 		}

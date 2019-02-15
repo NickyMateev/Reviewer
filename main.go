@@ -15,7 +15,7 @@ func main() {
 		panic(err)
 	}
 
-	srv, err := server.New(config.Server, db, github.NewClient(nil))
+	srv, err := server.New(config.Server, db, github.NewClient(nil), config.Slack)
 	if err != nil {
 		panic(err)
 	}

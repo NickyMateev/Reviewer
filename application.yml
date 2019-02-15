@@ -4,3 +4,7 @@ server:
 storage:
   type: postgres
   uri: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+slack:
+  channel_id: CG1234567
+  bot_token: xoxb-9ba2db44-2a81-4e8c-b55e-4f71aad23e45
+

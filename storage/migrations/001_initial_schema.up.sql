@@ -11,7 +11,8 @@ CREATE TABLE projects (
 CREATE TABLE users (
   id SERIAL PRIMARY KEY NOT NULL,
   username varchar(255) NOT NULL UNIQUE,
-  github_id INTEGER NOT NULL
+  github_id INTEGER NOT NULL,
+  metadata json NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE project_users (
