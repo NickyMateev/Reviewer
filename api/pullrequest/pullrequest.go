@@ -7,14 +7,14 @@ import (
 )
 
 // Controller returns an instance of the Pull Request controller
-func Controller(db *sql.DB) controller {
-	return controller{
+func Controller(db *sql.DB) *controller {
+	return &controller{
 		db: db,
 	}
 }
 
 // Routes returns all Pull Request routes
-func (c controller) Routes() []web.Route {
+func (c *controller) Routes() []web.Route {
 	return []web.Route{
 		{
 			Path:       web.PullRequestsURL,

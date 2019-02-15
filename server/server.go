@@ -84,6 +84,13 @@ func (s Server) startJobs() error {
 			return err
 		}
 	}
+
+	jobNames := make([]string, 0)
+	for _, job := range jobs {
+		jobNames = append(jobNames, job.Name())
+	}
+	log.Println("Scheduled jobs:", jobNames)
+
 	scheduler.Start()
 	return nil
 }
