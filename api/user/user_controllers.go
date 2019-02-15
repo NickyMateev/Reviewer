@@ -68,6 +68,11 @@ func (c *controller) listUsers(w http.ResponseWriter, r *http.Request) {
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
+
+	if len(users) == 0 {
+		users = []*models.User{}
+	}
+
 	web.WriteResponse(w, http.StatusOK, users)
 }
 

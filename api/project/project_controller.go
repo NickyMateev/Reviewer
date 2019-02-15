@@ -73,6 +73,11 @@ func (c *controller) listProject(w http.ResponseWriter, r *http.Request) {
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
+
+	if len(projects) == 0 {
+		projects = []*models.Project{}
+	}
+
 	web.WriteResponse(w, http.StatusOK, projects)
 }
 
