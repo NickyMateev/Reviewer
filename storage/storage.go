@@ -19,8 +19,9 @@ var (
 
 // Config holds all storage configuration settings
 type Config struct {
-	Type string
-	URI  string
+	Type          string
+	URI           string
+	MigrationsURL string
 }
 
 // New creates an *sql.DB object and updates the database with the latest migrations
@@ -30,7 +31,7 @@ func New(cfg Config) (*sql.DB, error) {
 		return nil, err
 	}
 
-	err = updateSchema(db, cfg.Type)
+	err = updateSchema(db, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -39,14 +40,17 @@ func New(cfg Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func updateSchema(db *sql.DB, dbType string) error {
+func updateSchema(db *sql.DB, config *Config) error {
 	driver, err := migratepg.WithInstance(db, &migratepg.Config{})
 	if err != nil {
 		return err
 	}
 
-	migrationsURL := fmt.Sprintf("file://%s/migrations", basepath)
-	m, err := migrate.NewWithDatabaseInstance(migrationsURL, dbType, driver)
+	if config.MigrationsURL == "" {
+		config.MigrationsURL = fmt.Sprintf("file://%s/migrations", basepath)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(config.MigrationsURL, config.Type, driver)
 	if err != nil {
 		return err
 	}

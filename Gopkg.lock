@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:d689318918dac8435731a16f090349f48f3758a3dbe5f967e913185bf264abaf"
+  name = "github.com/cloudfoundry-community/go-cfenv"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "f920e9562d5f951cbf11785728f67258c38a10d0"
+  version = "v1.17.0"
+
+[[projects]]
   digest = "1:1b487fd946176530c6c3669e55108e4ee45e1bd1ea0a630e28e3a173352d93e8"
   name = "github.com/ericlagergren/decimal"
   packages = [
@@ -281,6 +289,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/cloudfoundry-community/go-cfenv",
     "github.com/golang-migrate/migrate",
     "github.com/golang-migrate/migrate/database/postgres",
     "github.com/golang-migrate/migrate/source/file",
