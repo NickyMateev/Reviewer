@@ -63,3 +63,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/gavv/httpexpect"
+
+[[constraint]]
+  name = "github.com/DATA-DOG/go-sqlmock"
+  version = "1.3.2"

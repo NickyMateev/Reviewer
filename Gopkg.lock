@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:bcf7a85791e7f2a7d3099085f4ccddd7105fd449a322599114c3701e0d7a510d"
+  name = "github.com/DATA-DOG/go-sqlmock"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "472e287dbafe67e526a3797165b64cb14f34705a"
+  version = "v1.3.2"
+
+[[projects]]
   digest = "1:2aff5edb9bccd2974090fddb17ca7ab05a3f5c983db567c30c7f0b53404f5783"
   name = "github.com/ajg/form"
   packages = ["."]
@@ -474,6 +482,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/DATA-DOG/go-sqlmock",
     "github.com/gavv/httpexpect",
     "github.com/golang-migrate/migrate",
     "github.com/golang-migrate/migrate/database/postgres",
