@@ -10,8 +10,6 @@ import (
 	"log"
 )
 
-const githubURL = "https://github.com/%v/%v"
-
 // IdlersReminder is a regular job which sends a notification to all users who have not reviewed assigned pull requests
 type IdlersReminder struct {
 	db     *sql.DB
@@ -48,39 +46,54 @@ func (ir *IdlersReminder) Run() {
 		log.Panic("Error retrieving pull requests:", err)
 	}
 
-	attachment := new(slack.Attachment)
 	for _, pullRequest := range pullRequests {
 		for _, idler := range pullRequest.R.Idlers {
-			userMetadata := struct {
-				SlackID string `json:"slack_id"`
-			}{
-				SlackID: ir.config.ChannelID,
-			}
-
-			err := idler.Metadata.Unmarshal(&userMetadata)
-			if err != nil {
-				log.Printf("Error unmarshalling user [%v] metadata:%v\n", idler.Username, err)
-			}
-
-			attachment.Title = fmt.Sprintf("[%v]", pullRequest.R.Project.Name)
-			attachment.TitleLink = fmt.Sprintf(githubURL, pullRequest.R.Project.RepoOwner, pullRequest.R.Project.RepoName)
-			attachment.Text = fmt.Sprintf(":arrow_right: *%v [#%v]*\n\t%v", pullRequest.Title, pullRequest.Number, pullRequest.URL)
-
-			var mentionedUser string
-			if userMetadata.SlackID != ir.config.ChannelID {
-				mentionedUser = fmt.Sprintf("<@%v>", userMetadata.SlackID)
-			} else {
-				mentionedUser = fmt.Sprintf("%v", idler.Username)
-			}
-			_, _, err = ir.client.PostMessage(userMetadata.SlackID,
-				slack.MsgOptionText(fmt.Sprintf("*[%v]* :rotating_light: Review the following pull request unless you want to be part of the *Wall of Shame* tomorrow :rotating_light:", mentionedUser), false),
-				slack.MsgOptionAttachments(*attachment))
-			if err != nil {
+			msg := ir.prepareMessage(idler, pullRequest, pullRequest.R.Project)
+			if err := ir.sendSlackNotification(msg); err != nil {
 				log.Println("Slack notification could not be sent:", err)
 			} else {
 				log.Printf("Slack notification sent to %v for pending Pull Request review on %q\n", idler.Username, pullRequest.Title)
 			}
-
 		}
 	}
+}
+
+func (ir IdlersReminder) prepareMessage(idler *models.User, pullRequest *models.PullRequest, project *models.Project) *Message {
+	userMetadata := struct {
+		SlackID string `json:"slack_id"`
+	}{
+		SlackID: ir.config.ChannelID,
+	}
+
+	err := idler.Metadata.Unmarshal(&userMetadata)
+	if err != nil {
+		log.Printf("Error unmarshalling user [%v] metadata:%v\n", idler.Username, err)
+	}
+
+	var mentionedUser string
+	if userMetadata.SlackID != ir.config.ChannelID {
+		mentionedUser = fmt.Sprintf("<@%v>", userMetadata.SlackID)
+	} else {
+		mentionedUser = fmt.Sprintf("%v", idler.Username)
+	}
+	header := fmt.Sprintf("*[%v]* :rotating_light: Review the following pull request unless you want to be part of the *Wall of Shame* tomorrow :rotating_light:", mentionedUser)
+
+	attachment := new(slack.Attachment)
+	attachment.Title = fmt.Sprintf("[%v]", project.Name)
+	attachment.TitleLink = extractURLFromProject(project)
+
+	attachment.Text = fmt.Sprintf(":arrow_right: *%v [#%v]*\n\t%v", pullRequest.Title, pullRequest.Number, pullRequest.URL)
+
+	return &Message{
+		Attachment: attachment,
+		Header:     header,
+		Receiver:   userMetadata.SlackID,
+	}
+}
+
+func (ir IdlersReminder) sendSlackNotification(msg *Message) error {
+	_, _, err := ir.client.PostMessage(msg.Receiver,
+		slack.MsgOptionText(fmt.Sprintf(msg.Header), false),
+		slack.MsgOptionAttachments(*msg.Attachment))
+	return err
 }

@@ -77,8 +77,6 @@ func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequ
 		if !exists {
 			user := transformUser(pullRequest.GetUser(), prf.db)
 
-			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
-
 			pr := models.PullRequest{
 				Title:     pullRequest.GetTitle(),
 				URL:       pullRequest.GetHTMLURL(),
@@ -89,6 +87,7 @@ func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequ
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now()}
 
+			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
 			err = pr.Insert(context.Background(), prf.db, boil.Infer())
 			if err != nil {
 				log.Panicf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())

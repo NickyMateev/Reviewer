@@ -81,14 +81,14 @@ func (rf *ReviewFetcher) Run() {
 			}
 		}
 
-		idlers := rf.findIdlers(pr.R.Reviewers, reviewers)
+		idlers := findIdlers(pr.R.Reviewers, reviewers)
 		pr.AddIdlers(context.Background(), rf.db, false, idlers...)
 
 		pr.Update(context.Background(), rf.db, boil.Infer()) // updates the 'updated_at' column
 	}
 }
 
-func (rf *ReviewFetcher) findIdlers(requestedReviewers, actualReviewers []*models.User) []*models.User {
+func findIdlers(requestedReviewers, actualReviewers []*models.User) []*models.User {
 	idlers := make([]*models.User, 0)
 	for _, requestedReviewer := range requestedReviewers {
 		if !contains(actualReviewers, requestedReviewer) {

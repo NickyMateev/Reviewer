@@ -42,9 +42,9 @@ func New(cfg Config, db *sql.DB, client *github.Client, slackConfig job.SlackCon
 func (s Server) Run() {
 	defer s.DB.Close()
 
-	r := s.buildRouter()
+	r := buildRouter(s.API)
 
-	err := s.startJobs()
+	scheduler, err := scheduleJobs(s.JobContainer.Jobs())
 	if err != nil {
 		panic(err)
 	}
@@ -56,14 +56,17 @@ func (s Server) Run() {
 		WriteTimeout: s.Config.RequestTimeout,
 	}
 
+	log.Println("Starting scheduled jobs")
+	scheduler.Start()
+
 	log.Println("Server listening on port:", s.Config.Port)
 	log.Fatal(server.ListenAndServe())
 }
 
-func (s Server) buildRouter() *mux.Router {
+func buildRouter(api web.API) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
-	controllers := s.API.Controllers()
+	controllers := api.Controllers()
 	for _, controller := range controllers {
 		routes := controller.Routes()
 		for _, route := range routes {
@@ -74,14 +77,13 @@ func (s Server) buildRouter() *mux.Router {
 	return router
 }
 
-func (s Server) startJobs() error {
-	jobs := s.JobContainer.Jobs()
-
+func scheduleJobs(jobs []job.Job) (*cron.Cron, error) {
 	scheduler := cron.New()
 	for _, job := range jobs {
 		err := scheduler.AddJob(job.Period(), job)
 		if err != nil {
-			return err
+			log.Printf("Unable to add job %q\n", job.Name())
+			return nil, err
 		}
 	}
 
@@ -91,6 +93,5 @@ func (s Server) startJobs() error {
 	}
 	log.Println("Scheduled jobs:", jobNames)
 
-	scheduler.Start()
-	return nil
+	return scheduler, nil
 }

@@ -13,11 +13,13 @@ type Route struct {
 }
 
 // Controller defines a set of HTTP routes
+//go:generate counterfeiter . Controller
 type Controller interface {
 	Routes() []Route
 }
 
 // API defines a set of controllers which constitute the whole API of the application
+//go:generate counterfeiter . API
 type API interface {
 	Controllers() []Controller
 }
