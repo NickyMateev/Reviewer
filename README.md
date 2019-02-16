@@ -1,5 +1,6 @@
 # Reviewer
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/NickyMateev/Reviewer)](https://goreportcard.com/report/github.com/NickyMateev/Reviewer)
 [![Licence](https://img.shields.io/github/license/NickyMateev/Reviewer.svg?style=popout)](https://github.com/NickyMateev/Reviewer/blob/master/LICENSE)
 
 <p align="center">
