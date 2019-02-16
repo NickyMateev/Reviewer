@@ -1,6 +1,7 @@
 package project
 
 import (
+	"github.com/NickyMateev/Reviewer/storage/storagefakes"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/gavv/httpexpect"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 )
 
 func TestListProjects(t *testing.T) {
-	c := controller{}
+	c := controller{
+		storage: &storagefakes.FakeStorage{},
+	}
 
 	server := httptest.NewServer(web.HandleFunc(c.listProject))
 	defer server.Close()

@@ -23,6 +23,8 @@ type Config struct {
 	URI  string
 }
 
+// Storage abstracts away DB access
+//go:generate counterfeiter . Storage
 type Storage interface {
 	Get() *sql.DB
 	Close() error
