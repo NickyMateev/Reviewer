@@ -3,6 +3,7 @@ package pullrequest
 import (
 	"database/sql"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/gorilla/mux"
 	"github.com/volatiletech/sqlboiler/queries/qm"
@@ -11,7 +12,7 @@ import (
 )
 
 type controller struct {
-	db *sql.DB
+	storage storage.Storage
 }
 
 func (c *controller) getPullRequest(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +25,7 @@ func (c *controller) getPullRequest(w http.ResponseWriter, r *http.Request) {
 		qm.Load("Author"),
 		qm.Load("Approvers"),
 		qm.Load("Commenters"),
-		qm.Load("Idlers")).One(r.Context(), c.db)
+		qm.Load("Idlers")).One(r.Context(), c.storage.Get())
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -62,7 +63,7 @@ func (c *controller) getPullRequest(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listPullRequest(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all pull requests")
-	pullRequests, err := models.PullRequests().All(r.Context(), c.db)
+	pullRequests, err := models.PullRequests().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting pull requests:", err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})

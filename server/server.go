@@ -1,9 +1,9 @@
 package server
 
 import (
-	"database/sql"
 	"github.com/NickyMateev/Reviewer/api"
 	"github.com/NickyMateev/Reviewer/job"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -17,7 +17,7 @@ import (
 // Server represents the application's server
 type Server struct {
 	Config       Config
-	DB           *sql.DB
+	Storage      storage.Storage
 	API          web.API
 	JobContainer job.Container
 }
@@ -29,18 +29,18 @@ type Config struct {
 }
 
 // New creates a new Server instance
-func New(cfg Config, db *sql.DB, client *github.Client, slackConfig job.SlackConfig) (*Server, error) {
+func New(cfg Config, storage storage.Storage, client *github.Client, slackConfig job.SlackConfig) (*Server, error) {
 	return &Server{
 		Config:       cfg,
-		DB:           db,
-		API:          api.Default(db),
-		JobContainer: job.DefaultContainer(db, client, slackConfig),
+		Storage:      storage,
+		API:          api.Default(storage),
+		JobContainer: job.DefaultContainer(storage, client, slackConfig),
 	}, nil
 }
 
 // Run runs the application server
 func (s Server) Run() {
-	defer s.DB.Close()
+	defer s.Storage.Close()
 
 	r := buildRouter(s.API)
 

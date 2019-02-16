@@ -5,6 +5,11 @@ import "net/http"
 // HandleFunc defines a function type needed for Route constructions
 type HandleFunc func(w http.ResponseWriter, r *http.Request)
 
+// ServeHTTP allows normal HandlerFunc functions to behave like Handler implementations
+func (hf HandleFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	hf(w, r)
+}
+
 // Route defines a route that will be attached to a router
 type Route struct {
 	Path       string

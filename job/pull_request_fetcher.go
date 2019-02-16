@@ -2,9 +2,9 @@ package job
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/google/go-github/github"
 	"github.com/volatiletech/sqlboiler/boil"
 	"github.com/volatiletech/sqlboiler/queries/qm"
@@ -16,15 +16,15 @@ import (
 
 // PullRequestFetcher is a regular job which fetches the pull requests for all registered projects
 type PullRequestFetcher struct {
-	db     *sql.DB
-	client *github.Client
+	storage storage.Storage
+	client  *github.Client
 }
 
 // NewPullRequestFetcher creates an instance of PullRequestFetcher
-func NewPullRequestFetcher(db *sql.DB, client *github.Client) *PullRequestFetcher {
+func NewPullRequestFetcher(storage storage.Storage, client *github.Client) *PullRequestFetcher {
 	return &PullRequestFetcher{
-		db:     db,
-		client: client,
+		storage: storage,
+		client:  client,
 	}
 }
 
@@ -43,7 +43,7 @@ func (prf *PullRequestFetcher) Run() {
 	log.Printf("STARTING %v job", prf.Name())
 	defer log.Printf("FINISHED %v job", prf.Name())
 
-	projects, err := models.Projects().All(context.Background(), prf.db)
+	projects, err := models.Projects().All(context.Background(), prf.storage.Get())
 	if err != nil {
 		log.Panic("Unable to fetch projects:", err)
 	}
@@ -69,13 +69,13 @@ func (prf *PullRequestFetcher) Run() {
 func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for _, pullRequest := range pullRequests {
-		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), prf.db)
+		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), prf.storage.Get())
 		if err != nil {
 			log.Panicf("Error retrieving pull requests for %v: %v\n", projectName, err.Error())
 		}
 
 		if !exists {
-			user := transformUser(pullRequest.GetUser(), prf.db)
+			user := transformUser(pullRequest.GetUser(), prf.storage.Get())
 
 			pr := models.PullRequest{
 				Title:     pullRequest.GetTitle(),
@@ -88,7 +88,7 @@ func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequ
 				UpdatedAt: time.Now()}
 
 			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
-			err = pr.Insert(context.Background(), prf.db, boil.Infer())
+			err = pr.Insert(context.Background(), prf.storage.Get(), boil.Infer())
 			if err != nil {
 				log.Panicf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())
 			}
@@ -96,10 +96,10 @@ func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequ
 
 			reviewers := make([]*models.User, 0)
 			for _, reviewer := range pullRequest.RequestedReviewers {
-				reviewers = append(reviewers, transformUser(reviewer, prf.db))
+				reviewers = append(reviewers, transformUser(reviewer, prf.storage.Get()))
 			}
 			if len(reviewers) > 0 {
-				err := pr.AddReviewers(context.Background(), prf.db, false, reviewers...)
+				err := pr.AddReviewers(context.Background(), prf.storage.Get(), false, reviewers...)
 				if err != nil {
 					log.Panicf("Error persisting pull request reviewers %q (%v): %v\n", pr.Title, projectName, err.Error())
 				}

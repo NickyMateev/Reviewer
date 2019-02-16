@@ -1,15 +1,15 @@
 package user
 
 import (
-	"database/sql"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"net/http"
 )
 
 // Controller returns an instance of the User controller
-func Controller(db *sql.DB) *controller {
+func Controller(storage storage.Storage) *controller {
 	return &controller{
-		db: db,
+		storage: storage,
 	}
 }
 

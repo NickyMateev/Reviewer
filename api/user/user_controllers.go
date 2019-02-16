@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/gorilla/mux"
 	"github.com/volatiletech/sqlboiler/boil"
@@ -15,7 +16,7 @@ import (
 )
 
 type controller struct {
-	db *sql.DB
+	storage storage.Storage
 }
 
 func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,7 @@ func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
 		qm.Where("id = ?", userID),
 		qm.Load("ApprovedPullRequests"),
 		qm.Load("CommentedPullRequests"),
-		qm.Load("IdledPullRequests")).One(r.Context(), c.db)
+		qm.Load("IdledPullRequests")).One(r.Context(), c.storage.Get())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Missing user:", err)
@@ -62,7 +63,7 @@ func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listUsers(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all users")
-	users, err := models.Users().All(r.Context(), c.db)
+	users, err := models.Users().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting users:", err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
@@ -97,7 +98,7 @@ func (c *controller) patchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usr, err := models.Users(qm.Where("id = ?", userID)).One(r.Context(), c.db)
+	usr, err := models.Users(qm.Where("id = ?", userID)).One(r.Context(), c.storage.Get())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Missing user:", err)
@@ -110,7 +111,7 @@ func (c *controller) patchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	usr.Metadata = user.Metadata
-	_, err = usr.Update(context.Background(), c.db, boil.Infer())
+	_, err = usr.Update(context.Background(), c.storage.Get(), boil.Infer())
 	if err != nil {
 		log.Println("Error updating user with id", usr.ID)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
@@ -125,7 +126,7 @@ func (c *controller) deleteUser(w http.ResponseWriter, r *http.Request) {
 	userID := vars["id"]
 	log.Println("Deleting user with id", userID)
 
-	rows, err := models.Users(qm.Where("id = ?", userID)).DeleteAll(r.Context(), c.db)
+	rows, err := models.Users(qm.Where("id = ?", userID)).DeleteAll(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Printf("Error deleting user with id %v: %v", userID, err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
