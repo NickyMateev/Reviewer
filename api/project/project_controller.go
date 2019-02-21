@@ -37,9 +37,28 @@ func (c *controller) createProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = project.Insert(r.Context(), c.storage.Get(), boil.Infer())
+	db := c.storage.Get()
+	tx, txErr := db.BeginTx(r.Context(), nil)
+	if txErr != nil {
+		log.Printf("Unable to begin create transaction")
+		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
+		return
+	}
+
+	err = project.Insert(r.Context(), tx, boil.Infer())
 	if err != nil {
+		txErr = tx.Rollback()
+		if txErr != nil {
+			log.Printf("Could not rollback create transaction properly")
+		}
 		log.Println("Error creating new project:", err)
+		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
+		return
+	}
+
+	txErr = tx.Commit()
+	if txErr != nil {
+		log.Printf("Could not commit create transaction properly")
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
@@ -87,16 +106,47 @@ func (c *controller) deleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := vars["id"]
 	log.Println("Deleting project with id", projectID)
 
-	rows, err := models.Projects(qm.Where("id = ?", projectID)).DeleteAll(r.Context(), c.storage.Get())
-	if err != nil {
-		log.Printf("Error deleting project with id %v: %v", projectID, err)
+
+	db := c.storage.Get()
+	tx, txErr := db.BeginTx(r.Context(), nil)
+	if txErr != nil {
+		log.Printf("Unable to begin delete transaction")
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
 
-	if rows == 0 {
-		log.Println("Missing project:", err)
-		web.WriteResponse(w, http.StatusNotFound, web.ErrorResponse{Error: "missing project"})
+	project, err := models.Projects(qm.Where("id = ?", projectID)).One(r.Context(), tx)
+	if err != nil {
+		txErr := tx.Rollback()
+		if txErr != nil {
+			log.Printf("Could not rollback delete transaction properly")
+		}
+
+		if txErr == nil && err == sql.ErrNoRows {
+			log.Println("Missing project:", err)
+			web.WriteResponse(w, http.StatusNotFound, web.ErrorResponse{Error: "missing project"})
+		} else {
+			log.Printf("Error getting project with id %v: %v\n", projectID, err)
+			web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
+		}
+		return
+	}
+
+	_, err = project.Delete(r.Context(), tx)
+	if err != nil {
+		txErr := tx.Rollback()
+		if txErr != nil {
+			log.Printf("Could not rollback delete transaction properly")
+		}
+		log.Printf("Error deleting project with id %v: %v\n", projectID, err)
+		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
+		return
+	}
+
+	txErr = tx.Commit()
+	if txErr != nil {
+		log.Printf("Could not commit delete transaction properly")
+		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
 
