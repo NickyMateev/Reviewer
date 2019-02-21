@@ -40,7 +40,7 @@ COPY --from=builder /go/src/github.com/NickyMateev/Reviewer/storage/migrations/ 
 # Copy application.yml
 COPY --from=builder /go/src/github.com/NickyMateev/Reviewer/application.yml /app/application.yml
 
-ENV STORAGE_NAME=postgres-instance
+ENV STORAGE_NAME=reviewer-postgres
 
 # If one wants to use migrations scripts from somewhere else, overriding this env var would override the scripts from the image
 ENV STORAGE_MIGRATIONS_URL=file:///app

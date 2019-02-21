@@ -35,7 +35,8 @@ func (ir *IdlersReminder) Name() string {
 
 // Period returns the period of time when the IdlersReminder job should execute
 func (ir *IdlersReminder) Period() string {
-	return "0 0 16 * * *"
+//	return "0 0 16 * * *"
+	return "@every 1m"
 }
 
 // Run executes the IdlersReminder job

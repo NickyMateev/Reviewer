@@ -35,7 +35,8 @@ func (prf *PullRequestFetcher) Name() string {
 
 // Period returns the period of time when the PullRequestFetcher job should execute
 func (prf *PullRequestFetcher) Period() string {
-	return "@every 1h30m"
+//	return "@every 1h30m"
+	return "@every 40s"
 }
 
 // Run executes the PullRequestFetcher job

@@ -1,0 +1,11 @@
+---
+applications:
+- name: reviewer
+  memory: 64M
+  services:
+  - reviewer-postgres
+  docker:
+    image: nickymateev/reviewer
+  env:
+    GOPACKAGENAME: github.com/NickyMateev/Reviewer
+    STORAGE_NAME: reviewer-postgres

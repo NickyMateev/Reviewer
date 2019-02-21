@@ -34,7 +34,8 @@ func (rf *ReviewFetcher) Name() string {
 
 // Period returns the period of time when the ReviewFetcher job should execute
 func (rf *ReviewFetcher) Period() string {
-	return "@every 15m"
+//	return "@every 15m"
+	return "@every 20s"
 }
 
 // Run executes the ReviewFetcher job
@@ -76,9 +77,7 @@ func (rf *ReviewFetcher) Run() {
 					err = user.AddCommentedPullRequests(context.Background(), rf.db, false, pr)
 				}
 			}
-			if err != nil {
-				log.Panic("Unable to persist pull request activity record:", err)
-			}
+			if err := user.RemoveIdledPullRequests(context.Background(), rf.db, pr); err != nil {}
 		}
 
 		idlers := rf.findIdlers(pr.R.Reviewers, reviewers)
