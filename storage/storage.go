@@ -23,8 +23,25 @@ type Config struct {
 	URI  string
 }
 
+type Storage interface {
+	Get() *sql.DB
+	Close() error
+}
+
+type postgresStorage struct {
+	db *sql.DB
+}
+
+func (ps *postgresStorage) Get() *sql.DB {
+	return ps.db
+}
+
+func (ps *postgresStorage) Close() error {
+	return ps.db.Close()
+}
+
 // New creates an *sql.DB object and updates the database with the latest migrations
-func New(cfg Config) (*sql.DB, error) {
+func New(cfg Config) (Storage, error) {
 	db, err := sql.Open(cfg.Type, cfg.URI)
 	if err != nil {
 		return nil, err
@@ -36,7 +53,9 @@ func New(cfg Config) (*sql.DB, error) {
 	}
 	log.Println("Database is up-to-date")
 
-	return db, nil
+	return &postgresStorage{
+		db: db,
+	}, nil
 }
 
 func updateSchema(db *sql.DB, dbType string) error {

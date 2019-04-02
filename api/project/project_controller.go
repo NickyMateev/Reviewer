@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -14,7 +15,7 @@ import (
 )
 
 type controller struct {
-	db *sql.DB
+	storage storage.Storage
 }
 
 func (c *controller) createProject(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +37,7 @@ func (c *controller) createProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = project.Insert(r.Context(), c.db, boil.Infer())
+	err = project.Insert(r.Context(), c.storage.Get(), boil.Infer())
 	if err != nil {
 		log.Println("Error creating new project:", err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
@@ -51,7 +52,7 @@ func (c *controller) getProject(w http.ResponseWriter, r *http.Request) {
 	projectID := vars["id"]
 	log.Println("Getting project with id", projectID)
 
-	project, err := models.Projects(qm.Where("id = ?", projectID)).One(r.Context(), c.db)
+	project, err := models.Projects(qm.Where("id = ?", projectID)).One(r.Context(), c.storage.Get())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Missing project:", err)
@@ -67,7 +68,7 @@ func (c *controller) getProject(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listProject(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all projects")
-	projects, err := models.Projects().All(r.Context(), c.db)
+	projects, err := models.Projects().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting projects:", err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
@@ -86,7 +87,7 @@ func (c *controller) deleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := vars["id"]
 	log.Println("Deleting project with id", projectID)
 
-	rows, err := models.Projects(qm.Where("id = ?", projectID)).DeleteAll(r.Context(), c.db)
+	rows, err := models.Projects(qm.Where("id = ?", projectID)).DeleteAll(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Printf("Error deleting project with id %v: %v", projectID, err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})

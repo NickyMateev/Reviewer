@@ -1,7 +1,7 @@
 package job
 
 import (
-	"database/sql"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/google/go-github/github"
 	"github.com/robfig/cron"
 )
@@ -25,15 +25,15 @@ type Container interface {
 }
 
 type defaultContainer struct {
-	db          *sql.DB
+	storage     storage.Storage
 	client      *github.Client
 	slackConfig SlackConfig
 }
 
 // DefaultContainer creates an instance of the default job container
-func DefaultContainer(db *sql.DB, client *github.Client, config SlackConfig) Container {
+func DefaultContainer(storage storage.Storage, client *github.Client, config SlackConfig) Container {
 	return defaultContainer{
-		db:          db,
+		storage:     storage,
 		client:      client,
 		slackConfig: config,
 	}
@@ -42,8 +42,8 @@ func DefaultContainer(db *sql.DB, client *github.Client, config SlackConfig) Con
 // Jobs returns the defined jobs for the default job container
 func (jc defaultContainer) Jobs() []Job {
 	return []Job{
-		NewPullRequestFetcher(jc.db, jc.client),
-		NewReviewFetcher(jc.db, jc.client),
-		NewIdlersReminder(jc.db, jc.slackConfig),
+		NewPullRequestFetcher(jc.storage, jc.client),
+		NewReviewFetcher(jc.storage, jc.client),
+		NewIdlersReminder(jc.storage, jc.slackConfig),
 	}
 }

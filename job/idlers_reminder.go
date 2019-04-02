@@ -2,9 +2,9 @@ package job
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/nlopes/slack"
 	"github.com/volatiletech/sqlboiler/queries/qm"
 	"log"
@@ -14,17 +14,17 @@ const githubURL = "https://github.com/%v/%v"
 
 // IdlersReminder is a regular job which sends a notification to all users who have not reviewed assigned pull requests
 type IdlersReminder struct {
-	db     *sql.DB
-	client *slack.Client
-	config SlackConfig
+	storage storage.Storage
+	client  *slack.Client
+	config  SlackConfig
 }
 
 // NewIdlersReminder creates an instance of IdlersReminder
-func NewIdlersReminder(db *sql.DB, config SlackConfig) *IdlersReminder {
+func NewIdlersReminder(storage storage.Storage, config SlackConfig) *IdlersReminder {
 	return &IdlersReminder{
-		db:     db,
-		client: slack.New(config.BotToken),
-		config: config,
+		storage: storage,
+		client:  slack.New(config.BotToken),
+		config:  config,
 	}
 }
 
@@ -43,7 +43,7 @@ func (ir *IdlersReminder) Run() {
 	log.Printf("STARTING %v job", ir.Name())
 	defer log.Printf("FINISHED %v job", ir.Name())
 
-	pullRequests, err := models.PullRequests(qm.Load("Idlers"), qm.Load("Project")).All(context.Background(), ir.db)
+	pullRequests, err := models.PullRequests(qm.Load("Idlers"), qm.Load("Project")).All(context.Background(), ir.storage.Get())
 	if err != nil {
 		log.Panic("Error retrieving pull requests:", err)
 	}
