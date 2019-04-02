@@ -63,6 +63,8 @@ func (c *controller) getPullRequest(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listPullRequest(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all pull requests")
+
+	result := make([]*models.PullRequest, 0)
 	pullRequests, err := models.PullRequests().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting pull requests:", err)
@@ -70,11 +72,11 @@ func (c *controller) listPullRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(pullRequests) == 0 {
-		pullRequests = []*models.PullRequest{}
+	if len(pullRequests) > 0 {
+		result = pullRequests
 	}
 
-	web.WriteResponse(w, http.StatusOK, pullRequests)
+	web.WriteResponse(w, http.StatusOK, result)
 }
 
 func getUserStrings(users models.UserSlice) []string {

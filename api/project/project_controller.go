@@ -68,6 +68,8 @@ func (c *controller) getProject(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listProject(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all projects")
+
+	result := make([]*models.Project, 0)
 	projects, err := models.Projects().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting projects:", err)
@@ -75,11 +77,11 @@ func (c *controller) listProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(projects) == 0 {
-		projects = []*models.Project{}
+	if len(projects) > 0 {
+		result = projects
 	}
 
-	web.WriteResponse(w, http.StatusOK, projects)
+	web.WriteResponse(w, http.StatusOK, result)
 }
 
 func (c *controller) deleteProject(w http.ResponseWriter, r *http.Request) {

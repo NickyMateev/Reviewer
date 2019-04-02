@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/golang-migrate/migrate"
@@ -25,6 +26,7 @@ type Config struct {
 
 type Storage interface {
 	Get() *sql.DB
+	Transaction(context context.Context, operation func(context context.Context, tx *sql.Tx) error) error
 	Close() error
 }
 
@@ -34,6 +36,21 @@ type postgresStorage struct {
 
 func (ps *postgresStorage) Get() *sql.DB {
 	return ps.db
+}
+
+func (ps *postgresStorage) Transaction(context context.Context, operation func(context context.Context, tx *sql.Tx) error) error {
+	tx, err := ps.db.BeginTx(context, nil)
+	if err != nil {
+		return err
+	}
+
+	if opErr := operation(context, tx); opErr != nil {
+		if err := tx.Rollback(); err != nil {
+			return err
+		}
+		return opErr
+	}
+	return tx.Commit()
 }
 
 func (ps *postgresStorage) Close() error {
