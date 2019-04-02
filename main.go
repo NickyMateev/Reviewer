@@ -9,6 +9,9 @@ import (
 
 func main() {
 	config, err := config.New()
+	if err != nil {
+		panic(err)
+	}
 
 	db, err := storage.New(config.Storage)
 	if err != nil {

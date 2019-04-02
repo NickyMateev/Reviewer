@@ -68,6 +68,11 @@ func (c *controller) listPullRequest(w http.ResponseWriter, r *http.Request) {
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
+
+	if len(pullRequests) == 0 {
+		pullRequests = []*models.PullRequest{}
+	}
+
 	web.WriteResponse(w, http.StatusOK, pullRequests)
 }
 

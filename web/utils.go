@@ -12,7 +12,7 @@ type ErrorResponse struct {
 
 // WriteResponse writes a payload to the provided writer
 func WriteResponse(w http.ResponseWriter, status int, payload interface{}) {
-	w.WriteHeader(status)
 	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(payload)
 }

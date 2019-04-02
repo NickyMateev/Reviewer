@@ -66,6 +66,9 @@ func (rf *ReviewFetcher) Run() {
 				}
 				if !exists {
 					err = user.AddApprovedPullRequests(context.Background(), rf.db, false, pr)
+					if err != nil {
+						log.Panic("Unable to persist user approved pull request")
+					}
 				}
 			} else {
 				exists, err := user.CommentedPullRequests(qm.Where("pull_request_id = ?", pr.ID)).Exists(context.Background(), rf.db)
@@ -74,6 +77,9 @@ func (rf *ReviewFetcher) Run() {
 				}
 				if !exists {
 					err = user.AddCommentedPullRequests(context.Background(), rf.db, false, pr)
+					if err != nil {
+						log.Panic("Unable to persist user commented pull request")
+					}
 				}
 			}
 			if err != nil {
