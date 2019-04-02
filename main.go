@@ -17,11 +17,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
-	srv, err := server.New(config.Server, db, github.NewClient(nil), config.Slack)
-	if err != nil {
+	srv := server.New(config.Server, db, github.NewClient(nil), config.Slack)
+	if err := srv.Run(); err != nil {
 		panic(err)
 	}
-
-	srv.Run()
 }

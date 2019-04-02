@@ -18,7 +18,7 @@ import (
 type Server struct {
 	Config       Config
 	DB           *sql.DB
-	API          web.API
+	Router       *mux.Router
 	JobContainer job.Container
 }
 
@@ -29,41 +29,40 @@ type Config struct {
 }
 
 // New creates a new Server instance
-func New(cfg Config, db *sql.DB, client *github.Client, slackConfig job.SlackConfig) (*Server, error) {
+func New(cfg Config, db *sql.DB, client *github.Client, slackConfig job.SlackConfig) *Server {
+	defaultAPI := api.Default(db)
+	router := buildRouter(defaultAPI)
+
 	return &Server{
 		Config:       cfg,
 		DB:           db,
-		API:          api.Default(db),
+		Router:       router,
 		JobContainer: job.DefaultContainer(db, client, slackConfig),
-	}, nil
+	}
 }
 
 // Run runs the application server
-func (s Server) Run() {
-	defer s.DB.Close()
-
-	r := s.buildRouter()
-
+func (s *Server) Run() error {
 	err := s.startJobs()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	server := http.Server{
-		Handler:      r,
+		Handler:      s.Router,
 		Addr:         ":" + strconv.Itoa(s.Config.Port),
 		ReadTimeout:  s.Config.RequestTimeout,
 		WriteTimeout: s.Config.RequestTimeout,
 	}
 
 	log.Println("Server listening on port:", s.Config.Port)
-	log.Fatal(server.ListenAndServe())
+	return server.ListenAndServe()
 }
 
-func (s Server) buildRouter() *mux.Router {
+func buildRouter(api web.API) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
-	controllers := s.API.Controllers()
+	controllers := api.Controllers()
 	for _, controller := range controllers {
 		routes := controller.Routes()
 		for _, route := range routes {
@@ -74,7 +73,7 @@ func (s Server) buildRouter() *mux.Router {
 	return router
 }
 
-func (s Server) startJobs() error {
+func (s *Server) startJobs() error {
 	jobs := s.JobContainer.Jobs()
 
 	scheduler := cron.New()
