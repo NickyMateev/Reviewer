@@ -61,13 +61,14 @@ func (ps *postgresStorage) Close() error {
 func New(cfg Config) (Storage, error) {
 	db, err := sql.Open(cfg.Type, cfg.URI)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open db connection: %s", err)
 	}
 
 	err = updateSchema(db, cfg.Type)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to update db schema: %s", err)
 	}
+
 	log.Println("Database is up-to-date")
 
 	return &postgresStorage{

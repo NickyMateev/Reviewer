@@ -2,6 +2,8 @@ package job
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"github.com/NickyMateev/Reviewer/models"
 	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/google/go-github/github"
@@ -42,68 +44,68 @@ func (rf *ReviewFetcher) Run() {
 	log.Printf("STARTING %v job", rf.Name())
 	defer log.Printf("FINISHED %v job", rf.Name())
 
-	db := rf.storage.Get()
-
-	pullRequests, err := models.PullRequests(qm.Load("Project"), qm.Load("Reviewers")).All(context.Background(), db)
+	pullRequests, err := models.PullRequests(qm.Load("Project"), qm.Load("Reviewers")).All(context.Background(), rf.storage.Get())
 	if err != nil {
 		log.Println("Unable to fetch pull requests:", err)
 		return
 	}
 
-	for _, pr := range pullRequests {
-		reviews, resp, err := rf.client.PullRequests.ListReviews(context.Background(), pr.R.Project.RepoOwner, pr.R.Project.RepoName, int(pr.Number), nil)
+	for _, pullRequest := range pullRequests {
+		reviews, resp, err := rf.client.PullRequests.ListReviews(context.Background(), pullRequest.R.Project.RepoOwner, pullRequest.R.Project.RepoName, int(pullRequest.Number), nil)
 		if err != nil || resp.StatusCode != http.StatusOK {
 			log.Println("Unable to fetch pull request reviews:", err)
 			continue
 		}
-		log.Printf("(%d) review(s) fetched for pull request %q\n", len(reviews), pr.Title)
+		log.Printf("(%d) review(s) fetched for pull request %q\n", len(reviews), pullRequest.Title)
 
-		reviewers := make([]*models.User, 0)
-		for _, review := range reviews {
-			user, err := transformUser(review.GetUser(), db)
-			if err != nil {
-				log.Println("Unable to transform reviewer user:", err)
-				continue
-			}
-
-			reviewers = append(reviewers, user)
-
-			if review.GetState() == approvedState {
-				exists, err := user.ApprovedPullRequests(qm.Where("pull_request_id = ?", pr.ID)).Exists(context.Background(), db)
+		txErr := rf.storage.Transaction(context.Background(), func(context context.Context, tx *sql.Tx) error {
+			reviewers := make([]*models.User, 0)
+			for _, review := range reviews {
+				user, err := transformUser(context, tx, review.GetUser())
 				if err != nil {
-					log.Println("Unable to check pull request activity record:", err)
-					continue
+					return fmt.Errorf("unable to transform reviewer user: %s", err)
 				}
-				if !exists {
-					err = user.AddApprovedPullRequests(context.Background(), db, false, pr)
+
+				reviewers = append(reviewers, user)
+
+				if review.GetState() == approvedState {
+					exists, err := user.ApprovedPullRequests(qm.Where("pull_request_id = ?", pullRequest.ID)).Exists(context, tx)
 					if err != nil {
-						log.Println("Unable to persist user approved pull request")
-						continue
+						return err
 					}
-				}
-			} else {
-				exists, err := user.CommentedPullRequests(qm.Where("pull_request_id = ?", pr.ID)).Exists(context.Background(), db)
-				if err != nil {
-					log.Println("Unable to check pull request activity record:", err)
-					continue
-				}
-				if !exists {
-					err = user.AddCommentedPullRequests(context.Background(), db, false, pr)
+					if !exists {
+						err := user.AddApprovedPullRequests(context, tx, false, pullRequest)
+						if err != nil {
+							return err
+						}
+					}
+				} else {
+					exists, err := user.CommentedPullRequests(qm.Where("pull_request_id = ?", pullRequest.ID)).Exists(context, tx)
 					if err != nil {
-						log.Println("Unable to persist user commented pull request")
-						continue
+						return err
+					}
+					if !exists {
+						err := user.AddCommentedPullRequests(context, tx, false, pullRequest)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
+
+			idlers := rf.findIdlers(pullRequest.R.Reviewers, reviewers)
+			err = pullRequest.AddIdlers(context, tx, false, idlers...)
 			if err != nil {
-				log.Println("Unable to persist pull request activity record:", err)
+				return err
 			}
+
+			_, err = pullRequest.Update(context, tx, boil.Infer()) // updates the 'updated_at' column
+			return err
+		})
+
+		if txErr != nil {
+			log.Printf("Unable to persist pull request %q activity records: %v\n", pullRequest.Title, txErr)
 		}
-
-		idlers := rf.findIdlers(pr.R.Reviewers, reviewers)
-		pr.AddIdlers(context.Background(), db, false, idlers...)
-
-		pr.Update(context.Background(), db, boil.Infer()) // updates the 'updated_at' column
 	}
 }
 

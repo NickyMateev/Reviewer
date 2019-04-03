@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/NickyMateev/Reviewer/models"
 	"github.com/NickyMateev/Reviewer/storage"
@@ -63,65 +64,67 @@ func (prf *PullRequestFetcher) Run() {
 		log.Printf("(%d) pull request(s) fetched for project %v\n", len(pullRequests), projectName)
 
 		wg.Add(1)
-		go prf.fetchPullRequests(pullRequests, project.ID, projectName, &wg)
+		go prf.persistPullRequests(pullRequests, project.ID, projectName, &wg)
 	}
 	wg.Wait()
 }
 
-func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
+func (prf *PullRequestFetcher) persistPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
 	defer wg.Done()
-	db := prf.storage.Get()
 	for _, pullRequest := range pullRequests {
-		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), db)
-		if err != nil {
-			log.Printf("Error retrieving pull requests for %v: %v\n", projectName, err.Error())
-			continue
-		}
-
-		if exists {
-			continue
-		}
-
-		user, err := transformUser(pullRequest.GetUser(), db)
-		if err != nil {
-			log.Println("Unable to transform user:", err)
-			continue
-		}
-
-		log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
-
-		pr := models.PullRequest{
-			Title:     pullRequest.GetTitle(),
-			URL:       pullRequest.GetHTMLURL(),
-			Number:    int64(pullRequest.GetNumber()),
-			GithubID:  pullRequest.GetID(),
-			UserID:    user.ID,
-			ProjectID: projectID,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now()}
-
-		err = pr.Insert(context.Background(), db, boil.Infer())
-		if err != nil {
-			log.Printf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())
-			continue
-		}
-		log.Printf("Pull request %q successfully persisted (%v)\n", pr.Title, projectName)
-
-		reviewers := make([]*models.User, 0)
-		for _, reviewer := range pullRequest.RequestedReviewers {
-			rev, err := transformUser(reviewer, db)
+		txErr := prf.storage.Transaction(context.Background(), func(context context.Context, tx *sql.Tx) error {
+			exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context, tx)
 			if err != nil {
-				log.Println("Unable to transform reviewer user:", err)
-				continue
+				return fmt.Errorf("error retrieving pull requests for %v: %s", projectName, err)
 			}
 
-			reviewers = append(reviewers, rev)
-		}
-		if len(reviewers) > 0 {
-			err := pr.AddReviewers(context.Background(), db, false, reviewers...)
-			if err != nil {
-				log.Printf("Error persisting pull request reviewers %q (%v): %v\n", pr.Title, projectName, err.Error())
+			if exists {
+				return nil
 			}
+
+			user, err := transformUser(context, tx, pullRequest.GetUser())
+			if err != nil {
+				return fmt.Errorf("unable to transform user: %s", err)
+			}
+
+			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
+
+			pr := models.PullRequest{
+				Title:     pullRequest.GetTitle(),
+				URL:       pullRequest.GetHTMLURL(),
+				Number:    int64(pullRequest.GetNumber()),
+				GithubID:  pullRequest.GetID(),
+				UserID:    user.ID,
+				ProjectID: projectID,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now()}
+
+			err = pr.Insert(context, tx, boil.Infer())
+			if err != nil {
+				return err
+			}
+			log.Printf("Pull request %q successfully persisted (%v)\n", pr.Title, projectName)
+
+			reviewers := make([]*models.User, 0)
+			for _, reviewer := range pullRequest.RequestedReviewers {
+				rev, err := transformUser(context, tx, reviewer)
+				if err != nil {
+					return fmt.Errorf("unable to transform reviewer user: %s", err)
+				}
+
+				reviewers = append(reviewers, rev)
+			}
+			if len(reviewers) > 0 {
+				err := pr.AddReviewers(context, tx, false, reviewers...)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		if txErr != nil {
+			log.Printf("Unable to persist pull request %q: %s\n", pullRequest.Title, txErr)
 		}
 	}
 }
