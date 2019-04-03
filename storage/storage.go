@@ -57,7 +57,7 @@ func (ps *postgresStorage) Close() error {
 	return ps.db.Close()
 }
 
-// New creates an *sql.DB object and updates the database with the latest migrations
+// New creates a Storage object and updates the database with the latest migrations
 func New(cfg Config) (Storage, error) {
 	db, err := sql.Open(cfg.Type, cfg.URI)
 	if err != nil {

@@ -45,7 +45,8 @@ func (prf *PullRequestFetcher) Run() {
 
 	projects, err := models.Projects().All(context.Background(), prf.storage.Get())
 	if err != nil {
-		log.Panic("Unable to fetch projects:", err)
+		log.Println("Unable to fetch projects:", err)
+		return
 	}
 	log.Printf("%d project(s) are about to be reconciled\n", len(projects))
 
@@ -56,7 +57,8 @@ func (prf *PullRequestFetcher) Run() {
 
 		pullRequests, resp, err := prf.client.PullRequests.List(context.Background(), project.RepoOwner, project.RepoName, nil)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			log.Panic("Unable to fetch pull requests:", err)
+			log.Println("Unable to fetch pull requests:", err)
+			continue
 		}
 		log.Printf("(%d) pull request(s) fetched for project %v\n", len(pullRequests), projectName)
 
@@ -68,42 +70,57 @@ func (prf *PullRequestFetcher) Run() {
 
 func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
 	defer wg.Done()
+	db := prf.storage.Get()
 	for _, pullRequest := range pullRequests {
-		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), prf.storage.Get())
+		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), db)
 		if err != nil {
-			log.Panicf("Error retrieving pull requests for %v: %v\n", projectName, err.Error())
+			log.Printf("Error retrieving pull requests for %v: %v\n", projectName, err.Error())
+			continue
 		}
 
-		if !exists {
-			user := transformUser(pullRequest.GetUser(), prf.storage.Get())
+		if exists {
+			continue
+		}
 
-			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
+		user, err := transformUser(pullRequest.GetUser(), db)
+		if err != nil {
+			log.Println("Unable to transform user:", err)
+			continue
+		}
 
-			pr := models.PullRequest{
-				Title:     pullRequest.GetTitle(),
-				URL:       pullRequest.GetHTMLURL(),
-				Number:    int64(pullRequest.GetNumber()),
-				GithubID:  pullRequest.GetID(),
-				UserID:    user.ID,
-				ProjectID: projectID,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now()}
+		log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
 
-			err = pr.Insert(context.Background(), prf.storage.Get(), boil.Infer())
+		pr := models.PullRequest{
+			Title:     pullRequest.GetTitle(),
+			URL:       pullRequest.GetHTMLURL(),
+			Number:    int64(pullRequest.GetNumber()),
+			GithubID:  pullRequest.GetID(),
+			UserID:    user.ID,
+			ProjectID: projectID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now()}
+
+		err = pr.Insert(context.Background(), db, boil.Infer())
+		if err != nil {
+			log.Printf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())
+			continue
+		}
+		log.Printf("Pull request %q successfully persisted (%v)\n", pr.Title, projectName)
+
+		reviewers := make([]*models.User, 0)
+		for _, reviewer := range pullRequest.RequestedReviewers {
+			rev, err := transformUser(reviewer, db)
 			if err != nil {
-				log.Panicf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())
+				log.Println("Unable to transform reviewer user:", err)
+				continue
 			}
-			log.Printf("Pull request %q successfully persisted (%v)\n", pr.Title, projectName)
 
-			reviewers := make([]*models.User, 0)
-			for _, reviewer := range pullRequest.RequestedReviewers {
-				reviewers = append(reviewers, transformUser(reviewer, prf.storage.Get()))
-			}
-			if len(reviewers) > 0 {
-				err := pr.AddReviewers(context.Background(), prf.storage.Get(), false, reviewers...)
-				if err != nil {
-					log.Panicf("Error persisting pull request reviewers %q (%v): %v\n", pr.Title, projectName, err.Error())
-				}
+			reviewers = append(reviewers, rev)
+		}
+		if len(reviewers) > 0 {
+			err := pr.AddReviewers(context.Background(), db, false, reviewers...)
+			if err != nil {
+				log.Printf("Error persisting pull request reviewers %q (%v): %v\n", pr.Title, projectName, err.Error())
 			}
 		}
 	}

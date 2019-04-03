@@ -45,7 +45,8 @@ func (ir *IdlersReminder) Run() {
 
 	pullRequests, err := models.PullRequests(qm.Load("Idlers"), qm.Load("Project")).All(context.Background(), ir.storage.Get())
 	if err != nil {
-		log.Panic("Error retrieving pull requests:", err)
+		log.Println("Error retrieving pull requests:", err)
+		return
 	}
 
 	attachment := new(slack.Attachment)
