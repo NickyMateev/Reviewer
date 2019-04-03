@@ -13,15 +13,14 @@ func main() {
 		panic(err)
 	}
 
-	db, err := storage.New(config.Storage)
+	storage, err := storage.New(config.Storage)
 	if err != nil {
 		panic(err)
 	}
+	defer storage.Close()
 
-	srv, err := server.New(config.Server, db, github.NewClient(nil), config.Slack)
-	if err != nil {
+	srv := server.New(config.Server, storage, github.NewClient(nil), config.Slack)
+	if err := srv.Run(); err != nil {
 		panic(err)
 	}
-
-	srv.Run()
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/NickyMateev/Reviewer/web"
 	"github.com/gorilla/mux"
 	"github.com/volatiletech/sqlboiler/boil"
@@ -15,7 +16,7 @@ import (
 )
 
 type controller struct {
-	db *sql.DB
+	storage storage.Storage
 }
 
 func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,7 @@ func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
 		qm.Where("id = ?", userID),
 		qm.Load("ApprovedPullRequests"),
 		qm.Load("CommentedPullRequests"),
-		qm.Load("IdledPullRequests")).One(r.Context(), c.db)
+		qm.Load("IdledPullRequests")).One(r.Context(), c.storage.Get())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Missing user:", err)
@@ -62,18 +63,20 @@ func (c *controller) getUser(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) listUsers(w http.ResponseWriter, r *http.Request) {
 	log.Println("Getting all users")
-	users, err := models.Users().All(r.Context(), c.db)
+
+	result := make([]*models.User, 0)
+	users, err := models.Users().All(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Println("Error getting users:", err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
 		return
 	}
 
-	if len(users) == 0 {
-		users = []*models.User{}
+	if len(users) > 0 {
+		result = users
 	}
 
-	web.WriteResponse(w, http.StatusOK, users)
+	web.WriteResponse(w, http.StatusOK, result)
 }
 
 func (c *controller) patchUser(w http.ResponseWriter, r *http.Request) {
@@ -82,42 +85,42 @@ func (c *controller) patchUser(w http.ResponseWriter, r *http.Request) {
 	log.Println("Updating user with id", userID)
 
 	decoder := json.NewDecoder(r.Body)
-	user := models.User{}
-	err := decoder.Decode(&user)
+	reqUser := models.User{}
+	err := decoder.Decode(&reqUser)
 	if err != nil {
 		log.Println("Error decoding user payload:", err)
 		web.WriteResponse(w, http.StatusBadRequest, web.ErrorResponse{Error: "decoding error"})
 		return
 	}
 
-	err = validateUser(&user)
+	err = validateUser(&reqUser)
 	if err != nil {
 		log.Println("Validation error:", err)
 		web.WriteResponse(w, http.StatusBadRequest, web.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	usr, err := models.Users(qm.Where("id = ?", userID)).One(r.Context(), c.db)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Println("Missing user:", err)
-			web.WriteResponse(w, http.StatusNotFound, web.ErrorResponse{Error: "missing user"})
-		} else {
-			log.Printf("Error getting user with id %v: %v\n", userID, err)
-			web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
+	var user *models.User
+	txErr := c.storage.Transaction(r.Context(), func(context context.Context, tx *sql.Tx) error {
+		var err error
+		user, err = models.Users(qm.Where("id = ?", userID)).One(context, tx)
+		if err != nil {
+			return err
 		}
-		return
-	}
+		user.Metadata = reqUser.Metadata
+		_, err = user.Update(context, tx, boil.Infer())
+		return err
+	})
 
-	usr.Metadata = user.Metadata
-	_, err = usr.Update(context.Background(), c.db, boil.Infer())
-	if err != nil {
-		log.Println("Error updating user with id", usr.ID)
+	if txErr == sql.ErrNoRows {
+		log.Println("Missing user:", err)
+		web.WriteResponse(w, http.StatusNotFound, web.ErrorResponse{Error: "missing user"})
+	} else if txErr != nil {
+		log.Printf("Error updating user with id %v: %v\n", userID, err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})
-		return
 	}
 
-	web.WriteResponse(w, http.StatusNoContent, usr)
+	web.WriteResponse(w, http.StatusOK, user)
 }
 
 func (c *controller) deleteUser(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +128,7 @@ func (c *controller) deleteUser(w http.ResponseWriter, r *http.Request) {
 	userID := vars["id"]
 	log.Println("Deleting user with id", userID)
 
-	rows, err := models.Users(qm.Where("id = ?", userID)).DeleteAll(r.Context(), c.db)
+	rows, err := models.Users(qm.Where("id = ?", userID)).DeleteAll(r.Context(), c.storage.Get())
 	if err != nil {
 		log.Printf("Error deleting user with id %v: %v", userID, err)
 		web.WriteResponse(w, http.StatusInternalServerError, struct{}{})

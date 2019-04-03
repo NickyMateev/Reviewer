@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/NickyMateev/Reviewer/models"
+	"github.com/NickyMateev/Reviewer/storage"
 	"github.com/google/go-github/github"
 	"github.com/volatiletech/sqlboiler/boil"
 	"github.com/volatiletech/sqlboiler/queries/qm"
@@ -16,15 +17,15 @@ import (
 
 // PullRequestFetcher is a regular job which fetches the pull requests for all registered projects
 type PullRequestFetcher struct {
-	db     *sql.DB
-	client *github.Client
+	storage storage.Storage
+	client  *github.Client
 }
 
 // NewPullRequestFetcher creates an instance of PullRequestFetcher
-func NewPullRequestFetcher(db *sql.DB, client *github.Client) *PullRequestFetcher {
+func NewPullRequestFetcher(storage storage.Storage, client *github.Client) *PullRequestFetcher {
 	return &PullRequestFetcher{
-		db:     db,
-		client: client,
+		storage: storage,
+		client:  client,
 	}
 }
 
@@ -43,9 +44,10 @@ func (prf *PullRequestFetcher) Run() {
 	log.Printf("STARTING %v job", prf.Name())
 	defer log.Printf("FINISHED %v job", prf.Name())
 
-	projects, err := models.Projects().All(context.Background(), prf.db)
+	projects, err := models.Projects().All(context.Background(), prf.storage.Get())
 	if err != nil {
-		log.Panic("Unable to fetch projects:", err)
+		log.Println("Unable to fetch projects:", err)
+		return
 	}
 	log.Printf("%d project(s) are about to be reconciled\n", len(projects))
 
@@ -56,26 +58,34 @@ func (prf *PullRequestFetcher) Run() {
 
 		pullRequests, resp, err := prf.client.PullRequests.List(context.Background(), project.RepoOwner, project.RepoName, nil)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			log.Panic("Unable to fetch pull requests:", err)
+			log.Println("Unable to fetch pull requests:", err)
+			continue
 		}
 		log.Printf("(%d) pull request(s) fetched for project %v\n", len(pullRequests), projectName)
 
 		wg.Add(1)
-		go prf.fetchPullRequests(pullRequests, project.ID, projectName, &wg)
+		go prf.persistPullRequests(pullRequests, project.ID, projectName, &wg)
 	}
 	wg.Wait()
 }
 
-func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
+func (prf *PullRequestFetcher) persistPullRequests(pullRequests []*github.PullRequest, projectID int64, projectName string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for _, pullRequest := range pullRequests {
-		exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context.Background(), prf.db)
-		if err != nil {
-			log.Panicf("Error retrieving pull requests for %v: %v\n", projectName, err.Error())
-		}
+		txErr := prf.storage.Transaction(context.Background(), func(context context.Context, tx *sql.Tx) error {
+			exists, err := models.PullRequests(qm.Where("github_id = ?", pullRequest.GetID())).Exists(context, tx)
+			if err != nil {
+				return fmt.Errorf("error retrieving pull requests for %v: %s", projectName, err)
+			}
 
-		if !exists {
-			user := transformUser(pullRequest.GetUser(), prf.db)
+			if exists {
+				return nil
+			}
+
+			user, err := transformUser(context, tx, pullRequest.GetUser())
+			if err != nil {
+				return fmt.Errorf("unable to transform user: %s", err)
+			}
 
 			log.Printf("Persisting new pull request: %q (%v)\n", pullRequest.GetTitle(), projectName)
 
@@ -89,22 +99,32 @@ func (prf *PullRequestFetcher) fetchPullRequests(pullRequests []*github.PullRequ
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now()}
 
-			err = pr.Insert(context.Background(), prf.db, boil.Infer())
+			err = pr.Insert(context, tx, boil.Infer())
 			if err != nil {
-				log.Panicf("Error persisting pull request %q (%v): %v\n", pr.Title, projectName, err.Error())
+				return err
 			}
 			log.Printf("Pull request %q successfully persisted (%v)\n", pr.Title, projectName)
 
 			reviewers := make([]*models.User, 0)
 			for _, reviewer := range pullRequest.RequestedReviewers {
-				reviewers = append(reviewers, transformUser(reviewer, prf.db))
+				rev, err := transformUser(context, tx, reviewer)
+				if err != nil {
+					return fmt.Errorf("unable to transform reviewer user: %s", err)
+				}
+
+				reviewers = append(reviewers, rev)
 			}
 			if len(reviewers) > 0 {
-				err := pr.AddReviewers(context.Background(), prf.db, false, reviewers...)
+				err := pr.AddReviewers(context, tx, false, reviewers...)
 				if err != nil {
-					log.Panicf("Error persisting pull request reviewers %q (%v): %v\n", pr.Title, projectName, err.Error())
+					return err
 				}
 			}
+			return nil
+		})
+
+		if txErr != nil {
+			log.Printf("Unable to persist pull request %q: %s\n", *pullRequest.Title, txErr)
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/golang-migrate/migrate"
@@ -23,20 +24,56 @@ type Config struct {
 	URI  string
 }
 
-// New creates an *sql.DB object and updates the database with the latest migrations
-func New(cfg Config) (*sql.DB, error) {
+type Storage interface {
+	Get() *sql.DB
+	Transaction(context context.Context, operation func(context context.Context, tx *sql.Tx) error) error
+	Close() error
+}
+
+type postgresStorage struct {
+	db *sql.DB
+}
+
+func (ps *postgresStorage) Get() *sql.DB {
+	return ps.db
+}
+
+func (ps *postgresStorage) Transaction(context context.Context, operation func(context context.Context, tx *sql.Tx) error) error {
+	tx, err := ps.db.BeginTx(context, nil)
+	if err != nil {
+		return err
+	}
+
+	if opErr := operation(context, tx); opErr != nil {
+		if err := tx.Rollback(); err != nil {
+			return err
+		}
+		return opErr
+	}
+	return tx.Commit()
+}
+
+func (ps *postgresStorage) Close() error {
+	return ps.db.Close()
+}
+
+// New creates a Storage object and updates the database with the latest migrations
+func New(cfg Config) (Storage, error) {
 	db, err := sql.Open(cfg.Type, cfg.URI)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open db connection: %s", err)
 	}
 
 	err = updateSchema(db, cfg.Type)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to update db schema: %s", err)
 	}
+
 	log.Println("Database is up-to-date")
 
-	return db, nil
+	return &postgresStorage{
+		db: db,
+	}, nil
 }
 
 func updateSchema(db *sql.DB, dbType string) error {
