@@ -11,9 +11,14 @@ before_install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure --vendor-only -v
 
+install:
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
+
 services:
   - postgresql
 
 script:
   - migrate -source file://./storage/migrations -database "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" up
-  - go test ./...
+  - go test ./... -cover
+  - goveralls -service=travis-ci
