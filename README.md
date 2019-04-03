@@ -2,6 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/NickyMateev/Reviewer)](https://goreportcard.com/report/github.com/NickyMateev/Reviewer)
 [![Licence](https://img.shields.io/github/license/NickyMateev/Reviewer.svg?style=popout)](https://github.com/NickyMateev/Reviewer/blob/master/LICENSE)
+[![Coverage Status](https://coveralls.io/repos/github/NickyMateev/Reviewer/badge.svg)](https://coveralls.io/github/NickyMateev/Reviewer)
 
 <p align="center">
 <img src="docs/images/ReviewerLogo.png">

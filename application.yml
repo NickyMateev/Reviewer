@@ -1,5 +1,5 @@
 server:
-  port: 8888
+  port: 8080
   request_timeout: 4000ms
 storage:
   type: postgres
