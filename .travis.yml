@@ -7,7 +7,7 @@ addons:
   postgresql: "9.6"
 
 before_install:
-  - curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$platform-amd64.tar.gz | tar xvz
+  - go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure --vendor-only -v
 
