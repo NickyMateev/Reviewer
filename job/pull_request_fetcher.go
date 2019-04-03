@@ -124,7 +124,7 @@ func (prf *PullRequestFetcher) persistPullRequests(pullRequests []*github.PullRe
 		})
 
 		if txErr != nil {
-			log.Printf("Unable to persist pull request %q: %s\n", pullRequest.Title, txErr)
+			log.Printf("Unable to persist pull request %q: %s\n", *pullRequest.Title, txErr)
 		}
 	}
 }
