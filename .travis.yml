@@ -7,12 +7,5 @@ before_install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure --vendor-only -v
 
-install:
-  - go get github.com/alecthomas/gometalinter
-
-before_script:
-  - gometalinter --install --update
-
 script:
-  - gometalinter --vendor ./...
-  - go test ./... -p 1 -coverpkg $(go list ./... | egrep -v "fakes|test" | paste -sd "," -) -coverprofile=profile.cov
+  - go test ./...
